@@ -143,8 +143,19 @@ $('trade-address-img').onchange = (e) => {
 };
 
 $('add-trade-btn').onclick = () => {
-    $('trade-form').reset(); $('trade-id').value = ''; $('image-preview').innerHTML = ''; updateTradeItemSelects(); show('trade-modal');
+    $('trade-form').reset(); $('trade-id').value = ''; $('image-preview').innerHTML = ''; updateTradeItemSelects(); 
+    toggleModalCheckboxes('お声掛け中');
+    show('trade-modal');
 };
+
+// モーダル内のチェックボックスの活性・非活性を切り替える
+function toggleModalCheckboxes(status) {
+    const isDisabled = status !== '成約';
+    $('trade-is-sent').disabled = isDisabled;
+    $('trade-is-received').disabled = isDisabled;
+}
+
+$('trade-status').onchange = (e) => toggleModalCheckboxes(e.target.value);
 
 $('trade-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -152,7 +163,6 @@ $('trade-form').onsubmit = async (e) => {
     const giveItems = Array.from($('give-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').value) })).filter(i => i.id);
     const receiveItems = Array.from($('receive-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').value) })).filter(i => i.id);
     
-    // 現在のデータを取得しておく
     const oldTrade = id ? tradesData.find(t => t.id === id) : null;
     let imageUrl = oldTrade?.image_url || null;
 
@@ -167,12 +177,17 @@ $('trade-form').onsubmit = async (e) => {
         }
     }
 
+    const newStatus = $('trade-status').value;
+    const isActuallyContracted = newStatus === '成約';
+
     const newTradeData = {
-        user_id: currentUser.id, name: $('trade-name').value, type: $('trade-type').value, status: $('trade-status').value,
+        user_id: currentUser.id, name: $('trade-name').value, type: $('trade-type').value, status: newStatus,
         memo: $('trade-memo').value, give_items: giveItems, receive_items: receiveItems,
         give_price: parseInt($('trade-give-price').value), receive_price: parseInt($('trade-receive-price').value),
         image_url: imageUrl,
-        is_sent: $('trade-is-sent').checked, is_received: $('trade-is-received').checked,
+        // 成約していない場合は強制的にfalseにする（安全のため）
+        is_sent: isActuallyContracted ? $('trade-is-sent').checked : false, 
+        is_received: isActuallyContracted ? $('trade-is-received').checked : false,
         est_ship_date: $('trade-est-ship-date').value, est_receive_date: $('trade-est-receive-date').value
     };
 
@@ -197,7 +212,6 @@ async function syncStock(oldT, newT) {
         }
     };
 
-    // 1. 予定数の同期 (ステータスが成約になった時/解除された時)
     const oldContracted = oldT?.status === '成約';
     const newContracted = newT?.status === '成約';
     if (!oldContracted && newContracted) {
@@ -205,12 +219,10 @@ async function syncStock(oldT, newT) {
     } else if (oldContracted && !newContracted) {
         await solve(oldT.give_items, 'planned', 1); await solve(oldT.receive_items, 'planned', -1);
     } else if (oldContracted && newContracted) {
-        // アイテムが変わった場合の差分調整
         await solve(oldT.give_items, 'planned', 1); await solve(oldT.receive_items, 'planned', -1);
         await solve(newT.give_items, 'planned', -1); await solve(newT.receive_items, 'planned', 1);
     }
 
-    // 2. 実数の同期 (発送/受取チェック)
     if (!oldT?.is_sent && newT.is_sent) await solve(newT.give_items, 'actual', -1);
     else if (oldT?.is_sent && !newT.is_sent) await solve(oldT.give_items, 'actual', 1);
     if (!oldT?.is_received && newT.is_received) await solve(newT.receive_items, 'actual', 1);
@@ -225,6 +237,8 @@ function renderTrades() {
         const card = document.createElement('div'); card.className = 'trade-card';
         const giveText = t.give_items.map(i => { const g = goodsData.find(gx => gx.id===i.id); return g ? `${g.char}×${i.count}` : '?'; }).join(', ');
         const receiveText = t.receive_items.map(i => { const g = goodsData.find(gx => gx.id===i.id); return g ? `${g.char}×${i.count}` : '?'; }).join(', ');
+        
+        const isTradeContracted = t.status === '成約';
 
         card.innerHTML = `
             <div class="trade-header">
@@ -245,8 +259,12 @@ function renderTrades() {
                 ${t.image_url ? `<img src="${t.image_url}" class="trade-thumb" onclick="showOverlay('${t.image_url}')">` : ''}
             </div>
             <div class="trade-tags" style="margin-top:8px;">
-                <label class="tag ${t.is_sent?'done':''}"><input type="checkbox" ${t.is_sent?'checked':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済</label>
-                <label class="tag ${t.is_received?'done':''}"><input type="checkbox" ${t.is_received?'checked':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済</label>
+                <label class="tag ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
+                    <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済
+                </label>
+                <label class="tag ${t.is_received?'done':''} ${!isTradeContracted?'disabled':''}">
+                    <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済
+                </label>
             </div>
             ${t.memo ? `<div class="trade-memo-box">${t.memo}</div>` : ''}
             <div class="card-menu">
@@ -262,14 +280,15 @@ window.quickStatusChange = async (id, newS) => {
     const t = tradesData.find(x => x.id === id);
     if (!t) return;
     const newT = JSON.parse(JSON.stringify(t)); newT.status = newS;
+    if (newS !== '成約') { newT.is_sent = false; newT.is_received = false; }
     await syncStock(t, newT);
-    await sb.from('trades').update({ status: newS }).eq('id', id);
+    await sb.from('trades').update({ status: newS, is_sent: newT.is_sent, is_received: newT.is_received }).eq('id', id);
     fetchData();
 };
 
 window.quickCheck = async (id, field, value) => {
     const t = tradesData.find(x => x.id === id);
-    if (!t) return;
+    if (!t || t.status !== '成約') return;
     const newT = JSON.parse(JSON.stringify(t)); newT[field] = value;
     await syncStock(t, newT);
     await sb.from('trades').update({ [field]: value }).eq('id', id);
@@ -278,7 +297,6 @@ window.quickCheck = async (id, field, value) => {
 
 window.quickDateChange = async (id, field, value) => {
     await sb.from('trades').update({ [field]: value }).eq('id', id);
-    // fetchData(); // 全体更新だと入力中にフォーカスが外れる可能性があるので、ローカルデータのみ更新
     const t = tradesData.find(x => x.id === id);
     if (t) t[field] = value;
 };
@@ -292,15 +310,13 @@ window.editTrade = (id) => {
     $('trade-is-sent').checked = t.is_sent; $('trade-is-received').checked = t.is_received;
     $('trade-est-ship-date').value = t.est_ship_date || ''; $('trade-est-receive-date').value = t.est_receive_date || '';
 
+    toggleModalCheckboxes(t.status);
     updateTradeItemSelects();
     t.give_items.forEach((item, idx) => { if ($('give-items-list').children[idx]) { $('give-items-list').children[idx].querySelector('.item-id').value = item.id; $('give-items-list').children[idx].querySelector('.item-count').value = item.count; } });
     t.receive_items.forEach((item, idx) => { if ($('receive-items-list').children[idx]) { $('receive-items-list').children[idx].querySelector('.item-id').value = item.id; $('receive-items-list').children[idx].querySelector('.item-count').value = item.count; } });
 
-    if (t.image_url) {
-        $('image-preview').innerHTML = `<img src="${t.image_url}">`;
-    } else {
-        $('image-preview').innerHTML = '画像がありません';
-    }
+    if (t.image_url) $('image-preview').innerHTML = `<img src="${t.image_url}">`;
+    else $('image-preview').innerHTML = '画像がありません';
     show('trade-modal');
 };
 
