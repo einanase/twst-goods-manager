@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twst Goods Exchange - 在庫管理</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Shippori+Mincho:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app" class="twst-theme">
+        <!-- ナビゲーション -->
+        <nav class="main-nav">
+            <h1 class="logo">Twst Goods Manager</h1>
+            <div class="nav-links">
+                <button id="nav-inventory" class="nav-btn active">在庫管理</button>
+                <button id="nav-trades" class="nav-btn">取引管理</button>
+            </div>
+        </nav>
+
+        <!-- メインコンテンツ -->
+        <main id="content-area">
+            <!-- 在庫管理画面 (初期表示) -->
+            <section id="inventory-section" class="content-section">
+                <header class="section-header">
+                    <h2>在庫一覧</h2>
+                    <button id="add-goods-btn" class="primary-btn">+ グッズ追加</button>
+                </header>
+                <div id="goods-list" class="goods-grid">
+                    <!-- JSで動的に追加 -->
+                </div>
+            </section>
+
+            <!-- 取引管理画面 (非表示) -->
+            <section id="trades-section" class="content-section hidden">
+                <header class="section-header">
+                    <h2>取引一覧</h2>
+                    <button id="add-trade-btn" class="primary-btn">+ 取引追加</button>
+                </header>
+                <div class="trade-filters">
+                    <select id="status-filter">
+                        <option value="all">すべてのステータス</option>
+                        <option value="お声掛け中">お声掛け中</option>
+                        <option value="仮約束">仮約束</option>
+                        <option value="成約">成約</option>
+                        <option value="発送済">発送済</option>
+                        <option value="受取済">受取済</option>
+                    </select>
+                </div>
+                <div id="trades-list" class="trades-container">
+                    <!-- JSで動的に追加 -->
+                </div>
+            </section>
+        </main>
+
+        <!-- モーダル (グッズ追加) -->
+        <div id="goods-modal" class="modal hidden">
+            <div class="modal-content glass-panel">
+                <h3>グッズ新規登録</h3>
+                <form id="goods-form">
+                    <div class="form-group">
+                        <label>グッズ種類</label>
+                        <input type="text" id="goods-type" placeholder="例：缶バッジ、アクスタ" required>
+                    </div>
+                    <div class="form-group">
+                        <label>キャラクター</label>
+                        <input type="text" id="goods-char" placeholder="例：リドル、レオナ" required>
+                    </div>
+                    <div class="form-group">
+                        <label>初期在庫数</label>
+                        <input type="number" id="goods-count" value="0" min="0" required>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="cancel-btn">キャンセル</button>
+                        <button type="submit" class="confirm-btn">登録する</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- モーダル (取引追加) -->
+        <div id="trade-modal" class="modal hidden">
+            <div class="modal-content glass-panel large-modal">
+                <h3>取引情報の管理</h3>
+                <form id="trade-form">
+                    <input type="hidden" id="trade-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>相手のX ID</label>
+                            <input type="text" id="trade-name" placeholder="@username" required>
+                        </div>
+                        <div class="form-group">
+                            <label>取引内容</label>
+                            <select id="trade-type">
+                                <option value="交換">交換</option>
+                                <option value="譲渡">譲渡</option>
+                                <option value="交換+譲渡">交換+譲渡</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>ステータス</label>
+                        <select id="trade-status">
+                            <option value="お声掛け中">お声掛け中</option>
+                            <option value="仮約束">仮約束</option>
+                            <option value="成約">成約</option>
+                            <option value="発送済">発送済</option>
+                            <option value="受取済">受取済</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>渡すもの (対象グッズを選択)</label>
+                            <select id="trade-give-goods-id" required>
+                                <!-- 在庫リストから動的に生成 -->
+                            </select>
+                            <input type="number" id="trade-give-count" value="1" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label>譲るもの/受けるもの</label>
+                            <input type="text" id="trade-receive-desc" placeholder="例：レオナ缶バッジ1個">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>渡す金額</label>
+                            <input type="number" id="trade-give-price" value="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>受ける金額</label>
+                            <input type="number" id="trade-receive-price" value="0" min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>郵送先設定 (画像アップロード)</label>
+                        <div id="image-upload-area" class="upload-area">
+                            <span id="upload-label">画像をタップして選択</span>
+                            <input type="file" id="trade-address-img" accept="image/*" class="file-input">
+                            <div id="image-preview" class="image-preview"></div>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="cancel-btn">キャンセル</button>
+                        <button type="submit" class="confirm-btn">保存する</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 画像拡大用オーバーレイ -->
+        <div id="image-overlay" class="image-overlay hidden">
+            <span class="close-overlay">&times;</span>
+            <img src="" id="overlay-img" alt="Mailing Address">
+        </div>
+    </div>
+
+    <!-- スクリプト -->
+    <script src="db.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

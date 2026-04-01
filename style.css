@@ -1,0 +1,379 @@
+:root {
+    --bg-color: #0b0214; /* 深い紫がかった黒 */
+    --panel-bg: rgba(30, 20, 45, 0.85); /* 半透明のパネル */
+    --accent-gold: #d4af37; /* ツイステの金 */
+    --accent-red: #8b0000; /* クリムゾン */
+    --text-color: #f5f5dc; /* エイジド・ベージュ */
+    --secondary-text: #b8a9c9;
+    --border-color: rgba(212, 175, 55, 0.4);
+    --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Shippori Mincho', serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    background-image: 
+        radial-gradient(circle at 50% 50%, rgba(50, 20, 80, 0.3) 0%, transparent 80%),
+        url('https://www.transparenttextures.com/patterns/dark-leather.png'); /* 質感追加 */
+    color: var(--text-color);
+    min-height: 100vh;
+    padding-bottom: 2rem;
+}
+
+h1, h2, h3, .logo {
+    font-family: 'Cinzel', serif;
+    color: var(--accent-gold);
+    text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* ナビゲーション */
+.main-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 2px solid var(--accent-gold);
+    box-shadow: 0 2px 15px rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.logo {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    letter-spacing: 0.1em;
+}
+
+.nav-links {
+    display: flex;
+    gap: 1rem;
+}
+
+.nav-btn {
+    background: transparent;
+    border: 1px solid var(--accent-gold);
+    color: var(--accent-gold);
+    padding: 0.5rem 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 1rem;
+    border-radius: 4px;
+}
+
+.nav-btn.active {
+    background: var(--accent-gold);
+    color: var(--bg-color);
+    font-weight: bold;
+    box-shadow: 0 0 15px var(--accent-gold);
+}
+
+/* メインエリア */
+main {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid var(--accent-gold);
+    padding-left: 1rem;
+}
+
+/* ボタン */
+.primary-btn {
+    background: linear-gradient(135deg, var(--accent-gold), #b8860b);
+    color: var(--bg-color);
+    border: none;
+    padding: 0.6rem 1.2rem;
+    cursor: pointer;
+    font-weight: bold;
+    border-radius: 4px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transition: transform 0.2s;
+}
+
+.primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(212, 175, 55, 0.4);
+}
+
+/* 在庫グリッド */
+.goods-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.goods-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.2rem;
+    box-shadow: var(--shadow);
+    transition: border-color 0.3s;
+}
+
+.goods-card:hover {
+    border-color: var(--accent-gold);
+}
+
+.goods-info h4 {
+    color: var(--accent-gold);
+    font-size: 1.1rem;
+    margin-bottom: 0.3rem;
+}
+
+.goods-info .char-name {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 0.8rem;
+}
+
+.goods-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.counter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.count-display {
+    font-size: 1.5rem;
+    font-weight: bold;
+    min-width: 2rem;
+    text-align: center;
+}
+
+.count-btn {
+    background: transparent;
+    border: 1px solid var(--secondary-text);
+    color: var(--secondary-text);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2rem;
+}
+
+.count-btn:hover {
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
+}
+
+/* 取引リスト */
+.trades-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.trade-card {
+    background: var(--panel-bg);
+    border: 2px solid var(--border-color);
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.trade-header {
+    display: flex;
+    justify-content: space-between;
+}
+
+.trade-user {
+    font-weight: bold;
+    color: var(--accent-gold);
+}
+
+.trade-status-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    background: rgba(212, 175, 55, 0.2);
+    border: 1px solid var(--accent-gold);
+}
+
+.trade-details {
+    font-size: 0.9rem;
+    border-left: 2px solid var(--accent-gold);
+    padding-left: 0.8rem;
+}
+
+.trade-address-thumb {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+}
+
+/* モーダル */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.glass-panel {
+    background: rgba(40, 30, 60, 0.95);
+    border: 2px solid var(--accent-gold);
+    padding: 2rem;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 0 30px rgba(212, 175, 55, 0.2);
+}
+
+.large-modal {
+    max-width: 700px;
+}
+
+.form-group {
+    margin-bottom: 1.2rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: var(--secondary-text);
+    font-size: 0.9rem;
+}
+
+input, select, textarea {
+    width: 100%;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.6rem;
+    border-radius: 4px;
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 5px var(--accent-gold);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.cancel-btn {
+    background: transparent;
+    border: 1px solid var(--secondary-text);
+    color: var(--secondary-text);
+    padding: 0.6rem 1.2rem;
+    cursor: pointer;
+}
+
+/* 画像アップロード */
+.upload-area {
+    border: 2px dashed var(--border-color);
+    padding: 1.5rem;
+    text-align: center;
+    position: relative;
+    border-radius: 8px;
+}
+
+.file-input {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.image-preview img {
+    max-width: 100px;
+    margin-top: 10px;
+}
+
+/* オーバーレイ */
+.image-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+#overlay-img {
+    max-width: 90%;
+    max-height: 90%;
+    border: 3px solid var(--accent-gold);
+}
+
+.close-overlay {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: white;
+    font-size: 3rem;
+    cursor: pointer;
+}
+
+/* スマホ対応 */
+@media (max-width: 600px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    .main-nav {
+        padding: 1rem;
+    }
+    .logo {
+        font-size: 1.4rem;
+    }
+}
