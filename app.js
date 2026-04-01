@@ -73,9 +73,12 @@ function renderInventory() {
                 <div class="char-name">${g.char}</div>
             </div>
             <div class="goods-controls">
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px; margin-right:10px;">
+                    <div><span class="count-label">実数:</span><span class="count-num">${g.count}</span></div>
+                    <div><span class="count-label">予定:</span><span class="count-num count-planned">${g.planned_count ?? g.count}</span></div>
+                </div>
                 <div class="goods-count-group">
                     <button class="count-btn" onclick="updateCount('${g.id}', -1)">-</button>
-                    <span class="count-display">${g.count}</span>
                     <button class="count-btn" onclick="updateCount('${g.id}', 1)">+</button>
                 </div>
                 <div class="card-menu">
@@ -91,7 +94,10 @@ function renderInventory() {
 async function updateCount(id, delta) {
     const g = goodsData.find(x => x.id === id);
     if (!g) return;
-    await sb.from('goods').update({ count: Math.max(0, g.count + delta) }).eq('id', id);
+    const newCount = Math.max(0, g.count + delta);
+    // 実数を変えると、基本的には予定数も同期させる（取引以外の変動のため）
+    const newPlanned = Math.max(0, (g.planned_count ?? g.count) + delta);
+    await sb.from('goods').update({ count: newCount, planned_count: newPlanned }).eq('id', id);
     fetchData();
 }
 
@@ -99,7 +105,8 @@ $('add-goods-btn').onclick = () => { $('goods-form').reset(); $('goods-id-edit')
 $('goods-form').onsubmit = async (e) => {
     e.preventDefault();
     const id = $('goods-id-edit').value;
-    const data = { user_id: currentUser.id, type: $('goods-type').value, char: $('goods-char').value, count: parseInt($('goods-count').value) };
+    const count = parseInt($('goods-count').value);
+    const data = { user_id: currentUser.id, type: $('goods-type').value, char: $('goods-char').value, count: count, planned_count: count };
     if (id) await sb.from('goods').update(data).eq('id', id);
     else await sb.from('goods').insert([data]);
     hide('goods-modal'); fetchData();
@@ -146,46 +153,76 @@ $('trade-form').onsubmit = async (e) => {
     const giveItems = Array.from($('give-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').value) })).filter(i => i.id);
     const receiveItems = Array.from($('receive-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').value) })).filter(i => i.id);
     
-    const oldTrade = id ? tradesData.find(t => t.id === id) : null;
-    const status = $('trade-status').value;
-    await syncStock(oldTrade, { status, give_items: giveItems });
+    const oldTrade = id ? JSON.parse(JSON.stringify(tradesData.find(t => t.id === id))) : null;
+    const newStatus = $('trade-status').value;
+    const newIsSent = $('trade-is-sent').checked;
+    const newIsReceived = $('trade-is-received').checked;
 
     let imageUrl = oldTrade?.image_url || null;
     const file = $('trade-address-img').files[0];
     if (file) {
         const path = `${currentUser.id}/${Date.now()}_${file.name}`;
-        const { data } = await sb.storage.from('mailing-images').upload(path, file);
-        if (data) { imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl; }
+        const uploadRes = await sb.storage.from('mailing-images').upload(path, file);
+        if (uploadRes.data) { imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl; }
     }
 
-    const data = {
-        user_id: currentUser.id, name: $('trade-name').value, type: $('trade-type').value, status: status,
+    const newTradeData = {
+        user_id: currentUser.id, name: $('trade-name').value, type: $('trade-type').value, status: newStatus,
         memo: $('trade-memo').value, give_items: giveItems, receive_items: receiveItems,
         give_price: parseInt($('trade-give-price').value), receive_price: parseInt($('trade-receive-price').value),
         image_url: imageUrl,
-        is_sent: $('trade-is-sent').checked, is_received: $('trade-is-received').checked,
+        is_sent: newIsSent, is_received: newIsReceived,
         est_ship_date: $('trade-est-ship-date').value, est_receive_date: $('trade-est-receive-date').value
     };
 
-    if (id) await sb.from('trades').update(data).eq('id', id);
-    else await sb.from('trades').insert([data]);
+    // 在庫連動
+    await syncStock(oldTrade, newTradeData);
+
+    if (id) await sb.from('trades').update(newTradeData).eq('id', id);
+    else await sb.from('trades').insert([newTradeData]);
     hide('trade-modal'); fetchData();
 };
 
 async function syncStock(oldT, newT) {
-    const isReady = (s) => s === '成約';
-    // 前が成約以外で、今が成約になった時だけ引く（簡易化）
-    if ((!oldT || oldT.status !== '成約') && newT.status === '成約') {
-        for (const item of newT.give_items) {
-            const g = goodsData.find(x => x.id === item.id);
-            if (g) await sb.from('goods').update({ count: Math.max(0, g.count - item.count) }).eq('id', g.id);
+    const solve = async (items, type, delta) => {
+        for (const it of items) {
+            const g = goodsData.find(x => x.id === it.id);
+            if (!g) continue;
+            const updateObj = {};
+            if (type === 'planned') {
+                updateObj.planned_count = (g.planned_count ?? g.count) + (delta * it.count);
+            } else {
+                updateObj.count = g.count + (delta * it.count);
+            }
+            await sb.from('goods').update(updateObj).eq('id', g.id);
+            // ローカルデータも即座に更新して連続処理を可能にする
+            if (type === 'planned') g.planned_count = updateObj.planned_count; else g.count = updateObj.count;
         }
-    } else if (oldT && oldT.status === '成約' && newT.status !== '成約') {
-        for (const item of oldT.give_items) {
-            const g = goodsData.find(x => x.id === item.id);
-            if (g) await sb.from('goods').update({ count: g.count + item.count }).eq('id', g.id);
-        }
+    };
+
+    // 1. 予定数の同期 (ステータスが成約になった時/解除された時)
+    const oldContracted = oldT?.status === '成約';
+    const newContracted = newT?.status === '成約';
+    if (!oldContracted && newContracted) {
+        await solve(newT.give_items, 'planned', -1);
+        await solve(newT.receive_items, 'planned', 1);
+    } else if (oldContracted && !newContracted) {
+        await solve(oldT.give_items, 'planned', 1);
+        await solve(oldT.receive_items, 'planned', -1);
+    } else if (oldContracted && newContracted) {
+        // アイテムが変わった場合の差分調整
+        await solve(oldT.give_items, 'planned', 1);
+        await solve(oldT.receive_items, 'planned', -1);
+        await solve(newT.give_items, 'planned', -1);
+        await solve(newT.receive_items, 'planned', 1);
     }
+
+    // 2. 実数の同期 (発送/受取チェック)
+    if (!oldT?.is_sent && newT.is_sent) await solve(newT.give_items, 'actual', -1);
+    else if (oldT?.is_sent && !newT.is_sent) await solve(oldT.give_items, 'actual', 1);
+
+    if (!oldT?.is_received && newT.is_received) await solve(newT.receive_items, 'actual', 1);
+    else if (oldT?.is_received && !newT.is_received) await solve(oldT.receive_items, 'actual', -1);
 }
 
 function renderTrades() {
@@ -199,26 +236,24 @@ function renderTrades() {
 
         card.innerHTML = `
             <div class="trade-header">
-                <div>
-                    <span class="trade-user">${t.name}</span>
-                    <div class="trade-tags">
-                        <label class="tag ${t.is_sent?'done':''}"><input type="checkbox" ${t.is_sent?'checked':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送</label>
-                        <label class="tag ${t.is_received?'done':''}"><input type="checkbox" ${t.is_received?'checked':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取</label>
-                    </div>
-                </div>
+                <span class="trade-user">${t.name}</span>
                 <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
                     ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
                 </select>
             </div>
-            <div class="trade-details" style="display:flex; justify-content:space-between; align-items:flex-end;">
+            <div class="trade-details" style="display:flex; justify-content:space-between; align-items:flex-start;">
                 <div>
                     <div>渡: ${giveText || 'なし'}</div>
                     <div>受: ${receiveText || 'なし'}</div>
                     <div class="trade-dates">
-                        予定: 🚀${t.est_ship_date || '-'} / 🎁${t.est_receive_date || '-'}
+                        発送予定日：${t.est_ship_date || '-'} / 受取予定日：${t.est_receive_date || '-'}
                     </div>
                 </div>
                 ${t.image_url ? `<img src="${t.image_url}" class="trade-thumb" onclick="showOverlay('${t.image_url}')">` : ''}
+            </div>
+            <div class="trade-tags" style="margin-top:8px;">
+                <label class="tag ${t.is_sent?'done':''}"><input type="checkbox" ${t.is_sent?'checked':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済</label>
+                <label class="tag ${t.is_received?'done':''}"><input type="checkbox" ${t.is_received?'checked':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済</label>
             </div>
             ${t.memo ? `<div class="trade-memo-box">${t.memo}</div>` : ''}
             <div class="card-menu">
@@ -233,12 +268,17 @@ function renderTrades() {
 window.quickStatusChange = async (id, newS) => {
     const t = tradesData.find(x => x.id === id);
     if (!t) return;
-    await syncStock(t, { status: newS, give_items: t.give_items });
+    const newT = JSON.parse(JSON.stringify(t)); newT.status = newS;
+    await syncStock(t, newT);
     await sb.from('trades').update({ status: newS }).eq('id', id);
     fetchData();
 };
 
 window.quickCheck = async (id, field, value) => {
+    const t = tradesData.find(x => x.id === id);
+    if (!t) return;
+    const newT = JSON.parse(JSON.stringify(t)); newT[field] = value;
+    await syncStock(t, newT);
     await sb.from('trades').update({ [field]: value }).eq('id', id);
     fetchData();
 };
@@ -263,7 +303,10 @@ window.editTrade = (id) => {
 window.deleteTrade = async (id) => {
     if (confirm('削除しますか？')) {
         const t = tradesData.find(x => x.id === id);
-        if (t && t.status === '成約') await syncStock(t, { status: 'キャンセル', give_items: [] });
+        if (t && t.status === '成約') {
+            const undoT = JSON.parse(JSON.stringify(t)); undoT.status = 'キャンセル';
+            await syncStock(t, undoT);
+        }
         await sb.from('trades').delete().eq('id', id);
         fetchData();
     }
@@ -281,7 +324,7 @@ $('status-filter').onchange = renderTrades;
 async function checkAndMigrateLocalData() {
     const local = JSON.parse(localStorage.getItem('twst_goods') || '[]');
     if (local.length > 0 && confirm('ローカルデータを同期しますか？')) {
-        for (const g of local) { await sb.from('goods').insert([{ user_id: currentUser.id, type: g.type, char: g.char, count: g.count }]); }
+        for (const g of local) { await sb.from('goods').insert([{ user_id: currentUser.id, type: g.type, char: g.char, count: g.count, planned_count: g.count }]); }
         localStorage.removeItem('twst_goods'); fetchData();
     }
 }

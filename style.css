@@ -174,24 +174,31 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     color: var(--accent-gold); padding: 2px 5px; font-size: 0.8rem; border-radius: 4px;
 }
 
-.checkbox-group-row {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    padding-top: 1.2rem;
-}
-.checkbox-group-row label {
+.inline-checkbox {
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    cursor: pointer;
-    font-size: 0.9rem;
+    margin-top: 0.3rem;
+    font-size: 0.85rem;
     color: var(--accent-gold);
-}
-.checkbox-group-row input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
     cursor: pointer;
+}
+.inline-checkbox input {
+    margin: 0;
+}
+
+.count-label {
+    font-size: 0.7rem;
+    color: var(--secondary-text);
+    margin-right: 0.2rem;
+}
+.count-num {
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+.count-planned {
+    color: var(--accent-gold);
+    opacity: 0.8;
 }
 
 .image-preview-container {
