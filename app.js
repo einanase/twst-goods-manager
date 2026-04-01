@@ -66,24 +66,25 @@ function renderInventory() {
     list.innerHTML = '';
     goodsData.filter(g => g.char.toLowerCase().includes(q) || g.type.toLowerCase().includes(q)).forEach(g => {
         const card = document.createElement('div');
-        card.className = 'goods-card';
+        card.className = 'goods-card single-line';
         card.innerHTML = `
             <div class="goods-info">
-                <h4>${g.type}</h4>
-                <div class="char-name">${g.char}</div>
+                <span class="goods-name">${g.type} / ${g.char}</span>
             </div>
-            <div class="goods-controls">
-                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px; margin-right:10px;">
-                    <div><span class="count-label">実数:</span><span class="count-num">${g.count}</span></div>
-                    <div><span class="count-label">予定:</span><span class="count-num count-planned">${g.planned_count ?? g.count}</span></div>
+            <div class="goods-controls-wrap">
+                <div class="count-item">
+                    <span class="count-label">予定数</span>
+                    <span class="count-num count-planned">${g.planned_count ?? g.count}</span>
                 </div>
-                <div class="goods-count-group">
+                <div class="count-item actual-control">
+                    <span class="count-label">実数</span>
                     <button class="count-btn" onclick="updateCount('${g.id}', -1)">-</button>
+                    <span class="count-num">${g.count}</span>
                     <button class="count-btn" onclick="updateCount('${g.id}', 1)">+</button>
                 </div>
                 <div class="card-menu">
-                    <button class="nav-btn mini" onclick="editGoods('${g.id}')">集</button>
-                    <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}')">×</button>
+                    <button class="nav-btn mini" onclick="editGoods('${g.id}')">編集</button>
+                    <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}')">削除</button>
                 </div>
             </div>
         `;

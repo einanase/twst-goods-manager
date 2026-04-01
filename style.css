@@ -83,63 +83,52 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.2s;
 }
 
-/* 在庫：スリムな1行リスト形式 */
-.goods-compact-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-}
-
-.goods-card {
+/* 在庫：完全1行リスト形式 */
+.goods-card.single-line {
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    padding: 0.4rem 0.8rem;
+    padding: 0.6rem 1rem;
     display: flex;
-    flex-direction: row;
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
     box-shadow: none;
+    margin-bottom: 0.4rem;
 }
 
 .goods-info {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
     flex: 1;
-    overflow: hidden;
+    min-width: 0;
 }
 
-.goods-info h4 {
-    font-size: 0.8rem;
-    color: var(--secondary-text);
-    white-space: nowrap;
-}
-
-.goods-info h4::after {
-    content: " /";
-    margin-right: 0.2rem;
-}
-
-.goods-info .char-name {
-    font-size: 0.9rem;
+.goods-name {
+    font-size: 0.95rem;
     font-weight: bold;
-    color: var(--text-color);
+    color: var(--accent-gold);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.goods-controls {
+.goods-controls-wrap {
     display: flex;
-    flex-direction: row;
     align-items: center;
-    gap: 0.8rem;
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
+    gap: 1.2rem;
+    flex-shrink: 0;
+}
+
+.count-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.actual-control {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(212, 175, 55, 0.2);
 }
 
 .goods-count-group {
