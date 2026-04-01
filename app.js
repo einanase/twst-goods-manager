@@ -1,397 +1,346 @@
-// --- State Management ---
-let goods = JSON.parse(localStorage.getItem('twst-goods')) || [];
-let trades = JSON.parse(localStorage.getItem('twst-trades')) || [];
+const SUPABASE_URL = 'https://ykitplwgpgbidrnrqdan.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_hTSlL77g5EE0v9Y-tAjJEA_oSqBfopL';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Constants
-const STATUS_IN_FLIGHT = ['成約', '発送済', '受取済'];
+let currentUser = null;
+let goodsData = [];
+let tradesData = [];
 
-// --- DOM Elements ---
-const navInventory = document.getElementById('nav-inventory');
-const navTrades = document.getElementById('nav-trades');
-const inventorySection = document.getElementById('inventory-section');
-const tradesSection = document.getElementById('trades-section');
+// --- ユーティリティ ---
+const $ = (id) => document.getElementById(id);
+const show = (id) => $(id)?.classList.remove('hidden');
+const hide = (id) => $(id)?.classList.add('hidden');
 
-const goodsList = document.getElementById('goods-list');
-const tradesList = document.getElementById('trades-list');
+// --- 認証 ---
+async function initAuth() {
+    const { data: { session } } = await sb.auth.getSession();
+    handleAuthStateChange(session);
 
-const goodsModal = document.getElementById('goods-modal');
-const tradeModal = document.getElementById('trade-modal');
-const addGoodsBtn = document.getElementById('add-goods-btn');
-const addTradeBtn = document.getElementById('add-trade-btn');
-
-const goodsForm = document.getElementById('goods-form');
-const goodsIdInput = document.createElement('input'); // 編集用ID保持
-goodsIdInput.type = 'hidden';
-goodsIdInput.id = 'goods-id-edit';
-goodsForm.appendChild(goodsIdInput);
-
-const tradeForm = document.getElementById('trade-form');
-const tradeGiveGoodsSelect = document.getElementById('trade-give-goods-id');
-
-const imageOverlay = document.getElementById('image-overlay');
-const overlayImg = document.getElementById('overlay-img');
-const closeOverlay = document.querySelector('.close-overlay');
-
-// --- Initialization ---
-document.addEventListener('DOMContentLoaded', () => {
-    renderGoods();
-    renderTrades();
-    updateGiveGoodsOptions();
-    setupEventListeners();
-});
-
-function setupEventListeners() {
-    // Navigation
-    navInventory.addEventListener('click', () => switchTab('inventory'));
-    navTrades.addEventListener('click', () => switchTab('trades'));
-
-    // Modals
-    addGoodsBtn.addEventListener('click', () => {
-        goodsForm.reset();
-        document.getElementById('goods-id-edit').value = '';
-        document.querySelector('#goods-modal h3').textContent = 'グッズ新規登録';
-        showModal(goodsModal);
+    sb.auth.onAuthStateChange((_event, session) => {
+        handleAuthStateChange(session);
     });
-    addTradeBtn.addEventListener('click', () => {
-        tradeForm.reset();
-        document.getElementById('trade-id').value = '';
-        document.getElementById('image-preview').innerHTML = '';
-        showModal(tradeModal);
-    });
-
-    document.querySelectorAll('.cancel-btn').forEach(btn => {
-        btn.addEventListener('click', hideAllModals);
-    });
-
-    // Forms
-    goodsForm.addEventListener('submit', handleGoodsSubmit);
-    tradeForm.addEventListener('submit', handleTradeSubmit);
-
-    // Image Upload
-    const fileInput = document.getElementById('trade-address-img');
-    fileInput.addEventListener('change', handleImageSelect);
-
-    // Overlay
-    closeOverlay.addEventListener('click', () => imageOverlay.classList.add('hidden'));
 }
 
-// --- Tab Switching ---
-function switchTab(tab) {
-    if (tab === 'inventory') {
-        navInventory.classList.add('active');
-        navTrades.classList.remove('active');
-        inventorySection.classList.remove('hidden');
-        tradesSection.classList.add('hidden');
+function handleAuthStateChange(session) {
+    if (session) {
+        currentUser = session.user;
+        hide('auth-section');
+        show('main-app');
+        fetchData();
+        checkAndMigrateLocalData();
     } else {
-        navTrades.classList.add('active');
-        navInventory.classList.remove('active');
-        tradesSection.classList.remove('hidden');
-        inventorySection.classList.add('hidden');
-        renderTrades(); // Refresh
+        currentUser = null;
+        show('auth-section');
+        hide('main-app');
     }
 }
 
-// --- Modal Helpers ---
-function showModal(modal) {
-    modal.classList.remove('hidden');
-}
-
-function hideAllModals() {
-    goodsModal.classList.add('hidden');
-    tradeModal.classList.add('hidden');
-}
-
-// --- Goods Logic ---
-function handleGoodsSubmit(e) {
+$('auth-form').onsubmit = async (e) => {
     e.preventDefault();
-    const id = document.getElementById('goods-id-edit').value;
-    const type = document.getElementById('goods-type').value;
-    const char = document.getElementById('goods-char').value;
-    const count = parseInt(document.getElementById('goods-count').value);
+    const email = $('auth-email').value;
+    const password = $('auth-password').value;
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) $('auth-message').textContent = "ログイン失敗: " + error.message;
+};
 
-    if (id) {
-        // 編集
-        const item = goods.find(g => g.id === id);
-        if (item) {
-            item.type = type;
-            item.char = char;
-            item.count = count;
-        }
-    } else {
-        // 新規登録
-        const newGoods = {
-            id: Date.now().toString(),
-            type,
-            char,
-            count
-        };
-        goods.push(newGoods);
-    }
+$('signup-btn').onclick = async () => {
+    const email = $('auth-email').value;
+    const password = $('auth-password').value;
+    const { error } = await sb.auth.signUp({ email, password });
+    if (error) $('auth-message').textContent = "登録失敗: " + error.message;
+    else $('auth-message').textContent = "確認メールを送信しました。";
+};
 
-    saveGoods();
-    renderGoods();
-    updateGiveGoodsOptions();
-    hideAllModals();
-    goodsForm.reset();
+$('logout-btn').onclick = () => sb.auth.signOut();
+
+// --- データ取得 ---
+async function fetchData() {
+    const { data: g } = await sb.from('goods').select('*').order('created_at', { ascending: false });
+    const { data: t } = await sb.from('trades').select('*').order('created_at', { ascending: false });
+    goodsData = g || [];
+    tradesData = t || [];
+    renderInventory();
+    renderTrades();
+    updateTradeItemSelects();
 }
 
-function renderGoods() {
-    goodsList.innerHTML = '';
-    goods.forEach(item => {
+// --- 在庫管理 ---
+function renderInventory() {
+    const list = $('goods-list');
+    const q = $('goods-search').value.toLowerCase();
+    list.innerHTML = '';
+    goodsData.filter(g => g.char.toLowerCase().includes(q) || g.type.toLowerCase().includes(q)).forEach(g => {
         const card = document.createElement('div');
         card.className = 'goods-card';
         card.innerHTML = `
             <div class="goods-info">
-                <h4>${item.type}</h4>
-                <p class="char-name">${item.char}</p>
+                <h4>${g.type}</h4>
+                <div class="char-name">${g.char}</div>
             </div>
             <div class="goods-controls">
-                <div class="counter-group">
-                    <button class="count-btn" onclick="updateItemCount('${item.id}', -1)">-</button>
-                    <span class="count-display">${item.count}</span>
-                    <button class="count-btn" onclick="updateItemCount('${item.id}', 1)">+</button>
-                </div>
-                <div class="btn-group" style="display:flex; gap: 0.5rem;">
-                    <button class="nav-btn" style="padding: 4px 8px; font-size:0.7rem;" onclick="editGoods('${item.id}')">編集</button>
-                    <button class="cancel-btn" style="padding: 4px 8px; font-size:0.7rem;" onclick="deleteGoods('${item.id}')">削除</button>
+                <button class="count-btn" onclick="updateCount('${g.id}', -1)">-</button>
+                <span class="count-display">${g.count}</span>
+                <button class="count-btn" onclick="updateCount('${g.id}', 1)">+</button>
+                <div class="card-menu">
+                    <button class="nav-btn mini" onclick="editGoods('${g.id}')">集</button>
+                    <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}')">×</button>
                 </div>
             </div>
         `;
-        goodsList.appendChild(card);
+        list.appendChild(card);
     });
 }
 
-function editGoods(id) {
-    const item = goods.find(g => g.id === id);
-    if (!item) return;
-
-    document.getElementById('goods-id-edit').value = item.id;
-    document.getElementById('goods-type').value = item.type;
-    document.getElementById('goods-char').value = item.char;
-    document.getElementById('goods-count').value = item.count;
-    
-    document.querySelector('#goods-modal h3').textContent = 'グッズ情報の編集';
-    showModal(goodsModal);
+async function updateCount(id, delta) {
+    const g = goodsData.find(x => x.id === id);
+    if (!g) return;
+    const newCount = Math.max(0, g.count + delta);
+    await sb.from('goods').update({ count: newCount }).eq('id', id);
+    fetchData();
 }
 
-function updateItemCount(id, delta) {
-    const item = goods.find(g => g.id === id);
-    if (item) {
-        item.count = Math.max(0, item.count + delta);
-        saveGoods();
-        renderGoods();
-    }
-}
+$('add-goods-btn').onclick = () => {
+    $('goods-form').reset();
+    $('goods-id-edit').value = '';
+    show('goods-modal');
+};
 
-function deleteGoods(id) {
-    if (confirm('このグッズを削除しますか？紐づく取引がある場合、在庫数は戻りません。')) {
-        goods = goods.filter(g => g.id !== id);
-        saveGoods();
-        renderGoods();
-        updateGiveGoodsOptions();
-    }
-}
-
-function saveGoods() {
-    localStorage.setItem('twst-goods', JSON.stringify(goods));
-}
-
-function updateGiveGoodsOptions() {
-    tradeGiveGoodsSelect.innerHTML = '<option value="">選択してください</option>';
-    goods.forEach(item => {
-        const opt = document.createElement('option');
-        opt.value = item.id;
-        opt.textContent = `[${item.type}] ${item.char} (残り: ${item.count})`;
-        tradeGiveGoodsSelect.appendChild(opt);
-    });
-}
-
-// --- Trade Logic ---
-async function handleTradeSubmit(e) {
+$('goods-form').onsubmit = async (e) => {
     e.preventDefault();
-    const id = document.getElementById('trade-id').value || Date.now().toString();
-    const prevTrade = trades.find(t => t.id === id);
-    
-    const newTrade = {
-        id,
-        name: document.getElementById('trade-name').value,
-        type: document.getElementById('trade-type').value,
-        status: document.getElementById('trade-status').value,
-        giveGoodsId: document.getElementById('trade-give-goods-id').value,
-        giveCount: parseInt(document.getElementById('trade-give-count').value),
-        receiveDesc: document.getElementById('trade-receive-desc').value,
-        givePrice: parseInt(document.getElementById('trade-give-price').value),
-        receivePrice: parseInt(document.getElementById('trade-receive-price').value),
-        hasImage: !!document.getElementById('trade-address-img').files[0] || (prevTrade && prevTrade.hasImage)
+    const id = $('goods-id-edit').value;
+    const data = {
+        user_id: currentUser.id,
+        type: $('goods-type').value,
+        char: $('goods-char').value,
+        count: parseInt($('goods-count').value)
+    };
+    if (id) await sb.from('goods').update(data).eq('id', id);
+    else await sb.from('goods').insert([data]);
+    hide('goods-modal');
+    fetchData();
+};
+
+window.editGoods = (id) => {
+    const g = goodsData.find(x => x.id === id);
+    if (!g) return;
+    $('goods-id-edit').value = g.id;
+    $('goods-type').value = g.type;
+    $('goods-char').value = g.char;
+    $('goods-count').value = g.count;
+    show('goods-modal');
+};
+
+window.deleteGoods = async (id) => {
+    if (!confirm('削除しますか？')) return;
+    await sb.from('goods').delete().eq('id', id);
+    fetchData();
+};
+
+// --- 取引管理 ---
+function updateTradeItemSelects() {
+    const options = goodsData.map(g => `<option value="${g.id}">[${g.type}] ${g.char}</option>`).join('');
+    const containers = ['give-items-list', 'receive-items-list'];
+    containers.forEach(cid => {
+        const el = $(cid);
+        el.innerHTML = '';
+        for (let i = 0; i < 5; i++) {
+            const row = document.createElement('div');
+            row.className = 'item-row';
+            row.innerHTML = `
+                <select class="item-id"><option value="">--未選択--</option>${options}</select>
+                <input type="number" class="item-count" value="1" min="1">
+            `;
+            el.appendChild(row);
+        }
+    });
+}
+
+$('add-trade-btn').onclick = () => {
+    $('trade-form').reset();
+    $('trade-id').value = '';
+    $('image-preview').innerHTML = '';
+    updateTradeItemSelects();
+    show('trade-modal');
+};
+
+$('trade-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const id = $('trade-id').value;
+    const status = $('trade-status').value;
+    const giveItems = Array.from($('give-items-list').children).map(row => ({
+        id: row.querySelector('.item-id').value,
+        count: parseInt(row.querySelector('.item-count').value)
+    })).filter(i => i.id);
+    const receiveItems = Array.from($('receive-items-list').children).map(row => ({
+        id: row.querySelector('.item-id').value,
+        count: parseInt(row.querySelector('.item-count').value)
+    })).filter(i => i.id);
+
+    const oldTrade = id ? tradesData.find(t => t.id === id) : null;
+    await syncStock(oldTrade, { status, give_items: giveItems });
+
+    let imageUrl = oldTrade?.image_url || null;
+    const file = $('trade-address-img').files[0];
+    if (file) {
+        const path = `${currentUser.id}/${Date.now()}_${file.name}`;
+        const { data } = await sb.storage.from('mailing-images').upload(path, file);
+        if (data) {
+            const { data: { publicUrl } } = sb.storage.from('mailing-images').getPublicUrl(path);
+            imageUrl = publicUrl;
+        }
+    }
+
+    const data = {
+        user_id: currentUser.id,
+        name: $('trade-name').value,
+        type: $('trade-type').value,
+        status: status,
+        memo: $('trade-memo').value,
+        give_items: giveItems,
+        receive_items: receiveItems,
+        give_price: parseInt($('trade-give-price').value),
+        receive_price: parseInt($('trade-receive-price').value),
+        image_url: imageUrl
     };
 
-    // --- Inventory Sync Logic ---
-    syncInventory(prevTrade, newTrade);
+    if (id) await sb.from('trades').update(data).eq('id', id);
+    else await sb.from('trades').insert([data]);
+    hide('trade-modal');
+    fetchData();
+};
 
-    // Save Image if any
-    const file = document.getElementById('trade-address-img').files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            await saveImage(id, e.target.result);
-            finalizeTradeSave(id, newTrade);
-        };
-        reader.readAsDataURL(file);
-    } else {
-        finalizeTradeSave(id, newTrade);
+async function syncStock(oldTrade, newTrade) {
+    const isContracted = (s) => ['成約', '発送済', '受取済'].includes(s);
+    if (oldTrade && isContracted(oldTrade.status)) {
+        for (const item of oldTrade.give_items) {
+            const g = goodsData.find(x => x.id === item.id);
+            if (g) await sb.from('goods').update({ count: g.count + item.count }).eq('id', g.id);
+        }
+        const { data } = await sb.from('goods').select('*'); goodsData = data || [];
     }
-}
-
-function finalizeTradeSave(id, newTrade) {
-    const index = trades.findIndex(t => t.id === id);
-    if (index !== -1) {
-        trades[index] = newTrade;
-    } else {
-        trades.push(newTrade);
-    }
-    
-    saveTrades();
-    renderTrades();
-    renderGoods(); // Update counts in UI
-    updateGiveGoodsOptions();
-    hideAllModals();
-}
-
-function syncInventory(prev, current) {
-    const wasInFlight = prev ? STATUS_IN_FLIGHT.includes(prev.status) : false;
-    const isInFlight = STATUS_IN_FLIGHT.includes(current.status);
-
-    // Case 1: Status changed to In-Flight (Subtract)
-    if (!wasInFlight && isInFlight) {
-        updateGoodsStock(current.giveGoodsId, -current.giveCount);
-    }
-    // Case 2: Status changed FROM In-Flight (Add back)
-    else if (wasInFlight && !isInFlight) {
-        updateGoodsStock(prev.giveGoodsId, prev.giveCount);
-    }
-    // Case 3: Remains In-Flight but count/item changed
-    else if (wasInFlight && isInFlight) {
-        // Return previous count and subtract new count
-        updateGoodsStock(prev.giveGoodsId, prev.giveCount);
-        updateGoodsStock(current.giveGoodsId, -current.giveCount);
-    }
-}
-
-function updateGoodsStock(goodsId, delta) {
-    const item = goods.find(g => g.id === goodsId);
-    if (item) {
-        item.count += delta;
-        saveGoods();
+    if (isContracted(newTrade.status)) {
+        for (const item of newTrade.give_items) {
+            const g = goodsData.find(x => x.id === item.id);
+            if (g) await sb.from('goods').update({ count: Math.max(0, g.count - item.count) }).eq('id', g.id);
+        }
     }
 }
 
 function renderTrades() {
-    tradesList.innerHTML = '';
-    const filter = document.getElementById('status-filter').value;
-
-    trades.filter(t => filter === 'all' || t.status === filter).forEach(async trade => {
+    const list = $('trades-list');
+    const filter = $('status-filter').value;
+    list.innerHTML = '';
+    tradesData.filter(t => filter === 'all' || t.status === filter).forEach(t => {
         const card = document.createElement('div');
         card.className = 'trade-card';
-        
-        const goodsItem = goods.find(g => g.id === trade.giveGoodsId);
-        const goodsName = goodsItem ? `[${goodsItem.type}] ${goodsItem.char}` : '不明なグッズ';
+        const giveText = t.give_items.map(i => {
+            const g = goodsData.find(gx => gx.id === i.id);
+            return g ? `${g.char}×${i.count}` : '不明';
+        }).join(', ') || 'なし';
+        const receiveText = t.receive_items.map(i => {
+            const g = goodsData.find(gx => gx.id === i.id);
+            return g ? `${g.char}×${i.count}` : '不明';
+        }).join(', ') || 'なし';
 
         card.innerHTML = `
             <div class="trade-header">
-                <span class="trade-user">${trade.name}</span>
-                <span class="trade-status-badge">${trade.status}</span>
+                <span class="trade-user">${t.name}</span>
+                <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
+                    ${['お声掛け中','仮約束','成約','発送済','受取済'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
+                </select>
             </div>
             <div class="trade-details">
-                <p><strong>種類:</strong> ${trade.type}</p>
-                <p><strong>渡す:</strong> ${goodsName} × ${trade.giveCount}</p>
-                <p><strong>受ける:</strong> ${trade.receiveDesc || 'なし'}</p>
-                <p><strong>精算:</strong> 渡:¥${trade.givePrice} / 受:¥${trade.receivePrice}</p>
+                <div>渡: ${giveText}</div>
+                <div>受: ${receiveText}</div>
+                <div>精算: 渡¥${t.give_price} / 受¥${t.receive_price}</div>
             </div>
-            <div class="trade-actions" style="display:flex; justify-content: space-between; align-items:center;">
-                <div id="img-container-${trade.id}"></div>
-                <div class="btn-group" style="display:flex; gap: 0.5rem;">
-                    <button class="nav-btn" style="padding:4px 10px;" onclick="editTrade('${trade.id}')">編集</button>
-                    <button class="cancel-btn" style="padding:4px 10px;" onclick="deleteTrade('${trade.id}')">削除</button>
-                </div>
+            ${t.memo ? `<div class="trade-memo-box">${t.memo}</div>` : ''}
+            <div class="card-menu">
+                ${t.image_url ? `<button class="nav-btn mini" onclick="showOverlay('${t.image_url}')">郵送先</button>` : ''}
+                <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
+                <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
             </div>
         `;
-        tradesList.appendChild(card);
+        list.appendChild(card);
+    });
+}
 
-        // Load image thumbnail if exists
-        if (trade.hasImage) {
-            const dataUrl = await getImage(trade.id);
-            if (dataUrl) {
-                const img = document.createElement('img');
-                img.src = dataUrl;
-                img.className = 'trade-address-thumb';
-                img.onclick = () => openImageOverlay(dataUrl);
-                document.getElementById(`img-container-${trade.id}`).appendChild(img);
-            }
+window.quickStatusChange = async (id, newStatus) => {
+    const t = tradesData.find(x => x.id === id);
+    if (!t) return;
+    await syncStock(t, { status: newStatus, give_items: t.give_items });
+    await sb.from('trades').update({ status: newStatus }).eq('id', id);
+    fetchData();
+};
+
+window.editTrade = (id) => {
+    const t = tradesData.find(x => x.id === id);
+    if (!t) return;
+    $('trade-id').value = t.id;
+    $('trade-name').value = t.name;
+    $('trade-type').value = t.type;
+    $('trade-status').value = t.status;
+    $('trade-give-price').value = t.give_price;
+    $('trade-receive-price').value = t.receive_price;
+    $('trade-memo').value = t.memo || '';
+    
+    // アイテム復元
+    updateTradeItemSelects();
+    const gList = $('give-items-list').children;
+    t.give_items.forEach((item, idx) => {
+        if (gList[idx]) {
+            gList[idx].querySelector('.item-id').value = item.id;
+            gList[idx].querySelector('.item-count').value = item.count;
+        }
+    });
+    const rList = $('receive-items-list').children;
+    t.receive_items.forEach((item, idx) => {
+        if (rList[idx]) {
+            rList[idx].querySelector('.item-id').value = item.id;
+            rList[idx].querySelector('.item-count').value = item.count;
         }
     });
 
-    // Re-bind filter event
-    document.getElementById('status-filter').onchange = renderTrades;
-}
+    if (t.image_url) $('image-preview').innerHTML = `<img src="${t.image_url}" style="width:100px;">`;
+    show('trade-modal');
+};
 
-function openImageOverlay(src) {
-    overlayImg.src = src;
-    imageOverlay.classList.remove('hidden');
-}
+window.deleteTrade = async (id) => {
+    if (!confirm('削除しますか？')) return;
+    const t = tradesData.find(x => x.id === id);
+    await syncStock(t, { status: 'キャンセル', give_items: [] });
+    await sb.from('trades').delete().eq('id', id);
+    fetchData();
+};
 
-function editTrade(id) {
-    const trade = trades.find(t => t.id === id);
-    if (!trade) return;
+// --- その他UI ---
+$('nav-inventory').onclick = () => {
+    show('inventory-section'); hide('trades-section');
+    $('nav-inventory').classList.add('active'); $('nav-trades').classList.remove('active');
+};
+$('nav-trades').onclick = () => {
+    hide('inventory-section'); show('trades-section');
+    $('nav-inventory').classList.remove('active'); $('nav-trades').classList.add('active');
+};
+document.querySelectorAll('.cancel-btn').forEach(b => b.onclick = () => { hide('goods-modal'); hide('trade-modal'); });
+window.showOverlay = (url) => { $('overlay-img').src = url; show('image-overlay'); };
+$('image-overlay').onclick = () => hide('image-overlay');
+$('goods-search').oninput = renderInventory;
+$('status-filter').onchange = renderTrades;
 
-    document.getElementById('trade-id').value = trade.id;
-    document.getElementById('trade-name').value = trade.name;
-    document.getElementById('trade-type').value = trade.type;
-    document.getElementById('trade-status').value = trade.status;
-    document.getElementById('trade-give-goods-id').value = trade.giveGoodsId;
-    document.getElementById('trade-give-count').value = trade.giveCount;
-    document.getElementById('trade-receive-desc').value = trade.receiveDesc;
-    document.getElementById('trade-give-price').value = trade.givePrice;
-    document.getElementById('trade-receive-price').value = trade.receivePrice;
-
-    showModal(tradeModal);
-}
-
-function deleteTrade(id) {
-    if (confirm('取引を解除しますか？成約済みの場合は在庫が戻ります。')) {
-        const trade = trades.find(t => t.id === id);
-        if (trade && STATUS_IN_FLIGHT.includes(trade.status)) {
-            updateGoodsStock(trade.giveGoodsId, trade.giveCount);
+// --- 移行 ---
+async function checkAndMigrateLocalData() {
+    const localGoods = JSON.parse(localStorage.getItem('twst_goods') || '[]');
+    if (localGoods.length > 0) {
+        if (confirm('ローカルに保存されているデータをクラウドへ移行しますか？')) {
+            for (const g of localGoods) {
+                await sb.from('goods').insert([{ user_id: currentUser.id, type: g.type, char: g.char, count: g.count }]);
+            }
+            localStorage.removeItem('twst_goods');
+            fetchData();
         }
-        trades = trades.filter(t => t.id !== id);
-        deleteImage(id);
-        saveTrades();
-        renderTrades();
-        renderGoods();
-        updateGiveGoodsOptions();
     }
 }
 
-function saveTrades() {
-    localStorage.setItem('twst-trades', JSON.stringify(trades));
-}
-
-function handleImageSelect(e) {
-    const file = e.target.files[0];
-    if (file) {
-        document.getElementById('upload-label').textContent = file.name;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            document.getElementById('image-preview').innerHTML = `<img src="${e.target.result}" style="max-width:100px;">`;
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
-// Global functions for inline EventListeners
-window.updateItemCount = updateItemCount;
-window.editGoods = editGoods;
-window.deleteGoods = deleteGoods;
-window.editTrade = editTrade;
-window.deleteTrade = deleteTrade;
-window.openImageOverlay = openImageOverlay;
-window.renderTrades = renderTrades;
+initAuth();

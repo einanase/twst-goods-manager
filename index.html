@@ -3,84 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twst Goods Exchange - 在庫管理</title>
+    <title>Twst Goods Manager - クラウド同期版</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Shippori+Mincho:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div id="app" class="twst-theme">
-        <!-- ナビゲーション -->
-        <nav class="main-nav">
-            <h1 class="logo">Twst Goods Manager</h1>
-            <div class="nav-links">
-                <button id="nav-inventory" class="nav-btn active">在庫管理</button>
-                <button id="nav-trades" class="nav-btn">取引管理</button>
+        <!-- ログインセクション -->
+        <div id="auth-section" class="auth-overlay">
+            <div class="glass-panel main-auth-panel">
+                <h3>鏡の向こうへ（ログイン）</h3>
+                <p>データを同期するため、サインインしてください。</p>
+                <form id="auth-form">
+                    <div class="form-group">
+                        <label>メールアドレス</label>
+                        <input type="email" id="auth-email" placeholder="example@mail.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>パスワード</label>
+                        <input type="password" id="auth-password" placeholder="••••••••" required>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="submit" id="signin-btn" class="primary-btn">ログイン</button>
+                        <button type="button" id="signup-btn" class="nav-btn">新規登録</button>
+                    </div>
+                </form>
+                <div id="auth-message" class="auth-message"></div>
             </div>
-        </nav>
+        </div>
 
-        <!-- メインコンテンツ -->
-        <main id="content-area">
-            <!-- 在庫管理画面 (初期表示) -->
-            <section id="inventory-section" class="content-section">
-                <header class="section-header">
-                    <h2>在庫一覧</h2>
-                    <button id="add-goods-btn" class="primary-btn">+ グッズ追加</button>
-                </header>
-                <div id="goods-list" class="goods-grid">
-                    <!-- JSで動的に追加 -->
+        <!-- メインアプリ (ログイン後に表示) -->
+        <div id="main-app" class="hidden">
+            <nav class="main-nav">
+                <h1 class="logo">Twst Goods Manager</h1>
+                <div class="nav-links">
+                    <button id="nav-inventory" class="nav-btn active">在庫管理</button>
+                    <button id="nav-trades" class="nav-btn">取引管理</button>
+                    <button id="logout-btn" class="nav-btn cancel-btn">ログアウト</button>
                 </div>
-            </section>
+            </nav>
 
-            <!-- 取引管理画面 (非表示) -->
-            <section id="trades-section" class="content-section hidden">
-                <header class="section-header">
-                    <h2>取引一覧</h2>
-                    <button id="add-trade-btn" class="primary-btn">+ 取引追加</button>
-                </header>
-                <div class="trade-filters">
-                    <select id="status-filter">
-                        <option value="all">すべてのステータス</option>
-                        <option value="お声掛け中">お声掛け中</option>
-                        <option value="仮約束">仮約束</option>
-                        <option value="成約">成約</option>
-                        <option value="発送済">発送済</option>
-                        <option value="受取済">受取済</option>
-                    </select>
-                </div>
-                <div id="trades-list" class="trades-container">
-                    <!-- JSで動的に追加 -->
-                </div>
-            </section>
-        </main>
+            <main id="content-area">
+                <!-- 在庫管理画面 -->
+                <section id="inventory-section" class="content-section">
+                    <header class="section-header">
+                        <h2>在庫一覧</h2>
+                        <div class="header-actions">
+                            <input type="text" id="goods-search" class="search-input" placeholder="検索...">
+                            <button id="add-goods-btn" class="primary-btn">+ グッズ追加</button>
+                        </div>
+                    </header>
+                    <div id="goods-list" class="goods-compact-grid">
+                        <!-- 動的に生成 -->
+                    </div>
+                </section>
 
-        <!-- モーダル (グッズ追加) -->
+                <!-- 取引管理画面 -->
+                <section id="trades-section" class="content-section hidden">
+                    <header class="section-header">
+                        <h2>取引一覧</h2>
+                        <button id="add-trade-btn" class="primary-btn">+ 取引追加</button>
+                    </header>
+                    <div class="trade-filters">
+                        <select id="status-filter">
+                            <option value="all">すべてのステータス</option>
+                            <option value="お声掛け中">お声掛け中</option>
+                            <option value="仮約束">仮約束</option>
+                            <option value="成約">成約</option>
+                            <option value="発送済">発送済</option>
+                            <option value="受取済">受取済</option>
+                        </select>
+                    </div>
+                    <div id="trades-list" class="trades-container">
+                        <!-- 動的に生成 -->
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- モーダル (グッズ追加/編集) -->
         <div id="goods-modal" class="modal hidden">
             <div class="modal-content glass-panel">
-                <h3>グッズ新規登録</h3>
+                <h3>グッズ情報</h3>
                 <form id="goods-form">
+                    <input type="hidden" id="goods-id-edit">
                     <div class="form-group">
                         <label>グッズ種類</label>
-                        <input type="text" id="goods-type" placeholder="例：缶バッジ、アクスタ" required>
+                        <input type="text" id="goods-type" placeholder="例：缶バッジ" required>
                     </div>
                     <div class="form-group">
                         <label>キャラクター</label>
-                        <input type="text" id="goods-char" placeholder="例：リドル、レオナ" required>
+                        <input type="text" id="goods-char" placeholder="例：リドル" required>
                     </div>
                     <div class="form-group">
-                        <label>初期在庫数</label>
+                        <label>在庫数</label>
                         <input type="number" id="goods-count" value="0" min="0" required>
                     </div>
                     <div class="modal-actions">
                         <button type="button" class="cancel-btn">キャンセル</button>
-                        <button type="submit" class="confirm-btn">登録する</button>
+                        <button type="submit" class="confirm-btn">保存する</button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- モーダル (取引追加) -->
+        <!-- モーダル (取引追加/編集) - 最大5種類対応 -->
         <div id="trade-modal" class="modal hidden">
             <div class="modal-content glass-panel large-modal">
                 <h3>取引情報の管理</h3>
@@ -110,19 +141,24 @@
                             <option value="受取済">受取済</option>
                         </select>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>渡すもの (対象グッズを選択)</label>
-                            <select id="trade-give-goods-id" required>
-                                <!-- 在庫リストから動的に生成 -->
-                            </select>
-                            <input type="number" id="trade-give-count" value="1" min="1" required>
+
+                    <div class="trade-items-flex">
+                        <!-- 渡すもの (左側) -->
+                        <div class="trade-items-column">
+                            <label>渡すもの (最大5つ)</label>
+                            <div id="give-items-list" class="multi-items-list">
+                                <!-- JSで5行生成 -->
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>譲るもの/受けるもの</label>
-                            <input type="text" id="trade-receive-desc" placeholder="例：レオナ缶バッジ1個">
+                        <!-- 受けるもの (右側) -->
+                        <div class="trade-items-column">
+                            <label>受けるもの (最大5つ)</label>
+                            <div id="receive-items-list" class="multi-items-list">
+                                <!-- JSで5行生成 -->
+                            </div>
                         </div>
                     </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label>渡す金額</label>
@@ -133,6 +169,12 @@
                             <input type="number" id="trade-receive-price" value="0" min="0">
                         </div>
                     </div>
+
+                    <div class="form-group">
+                        <label>メモ欄 (自由記入)</label>
+                        <textarea id="trade-memo" rows="3" placeholder="発送予定日、梱包の約束など..."></textarea>
+                    </div>
+
                     <div class="form-group">
                         <label>郵送先設定 (画像アップロード)</label>
                         <div id="image-upload-area" class="upload-area">
@@ -156,8 +198,7 @@
         </div>
     </div>
 
-    <!-- スクリプト -->
-    <script src="db.js"></script>
+    <!-- スクリプト (db.jsは統合のため削除) -->
     <script src="app.js"></script>
 </body>
 </html>
