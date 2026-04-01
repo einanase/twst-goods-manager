@@ -96,7 +96,6 @@ async function updateCount(id, delta) {
     const g = goodsData.find(x => x.id === id);
     if (!g) return;
     const newCount = Math.max(0, g.count + delta);
-    // 実数を変えると、基本的には予定数も同期させる（取引以外の変動のため）
     const newPlanned = Math.max(0, (g.planned_count ?? g.count) + delta);
     await sb.from('goods').update({ count: newCount, planned_count: newPlanned }).eq('id', id);
     fetchData();
@@ -135,7 +134,6 @@ function updateTradeItemSelects() {
     });
 }
 
-// プレビュー表示
 $('trade-address-img').onchange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -154,25 +152,27 @@ $('trade-form').onsubmit = async (e) => {
     const giveItems = Array.from($('give-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').value) })).filter(i => i.id);
     const receiveItems = Array.from($('receive-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').value) })).filter(i => i.id);
     
-    const oldTrade = id ? JSON.parse(JSON.stringify(tradesData.find(t => t.id === id))) : null;
-    const newStatus = $('trade-status').value;
-    const newIsSent = $('trade-is-sent').checked;
-    const newIsReceived = $('trade-is-received').checked;
-
+    // 現在のデータを取得しておく
+    const oldTrade = id ? tradesData.find(t => t.id === id) : null;
     let imageUrl = oldTrade?.image_url || null;
+
     const file = $('trade-address-img').files[0];
     if (file) {
         const path = `${currentUser.id}/${Date.now()}_${file.name}`;
-        const uploadRes = await sb.storage.from('mailing-images').upload(path, file);
-        if (uploadRes.data) { imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl; }
+        const { data: uploadData, error: uploadError } = await sb.storage.from('mailing-images').upload(path, file);
+        if (!uploadError) {
+            imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl;
+        } else {
+            console.error("画像アップロードエラー:", uploadError);
+        }
     }
 
     const newTradeData = {
-        user_id: currentUser.id, name: $('trade-name').value, type: $('trade-type').value, status: newStatus,
+        user_id: currentUser.id, name: $('trade-name').value, type: $('trade-type').value, status: $('trade-status').value,
         memo: $('trade-memo').value, give_items: giveItems, receive_items: receiveItems,
         give_price: parseInt($('trade-give-price').value), receive_price: parseInt($('trade-receive-price').value),
         image_url: imageUrl,
-        is_sent: newIsSent, is_received: newIsReceived,
+        is_sent: $('trade-is-sent').checked, is_received: $('trade-is-received').checked,
         est_ship_date: $('trade-est-ship-date').value, est_receive_date: $('trade-est-receive-date').value
     };
 
@@ -190,13 +190,9 @@ async function syncStock(oldT, newT) {
             const g = goodsData.find(x => x.id === it.id);
             if (!g) continue;
             const updateObj = {};
-            if (type === 'planned') {
-                updateObj.planned_count = (g.planned_count ?? g.count) + (delta * it.count);
-            } else {
-                updateObj.count = g.count + (delta * it.count);
-            }
+            if (type === 'planned') updateObj.planned_count = (g.planned_count ?? g.count) + (delta * it.count);
+            else updateObj.count = g.count + (delta * it.count);
             await sb.from('goods').update(updateObj).eq('id', g.id);
-            // ローカルデータも即座に更新して連続処理を可能にする
             if (type === 'planned') g.planned_count = updateObj.planned_count; else g.count = updateObj.count;
         }
     };
@@ -205,23 +201,18 @@ async function syncStock(oldT, newT) {
     const oldContracted = oldT?.status === '成約';
     const newContracted = newT?.status === '成約';
     if (!oldContracted && newContracted) {
-        await solve(newT.give_items, 'planned', -1);
-        await solve(newT.receive_items, 'planned', 1);
+        await solve(newT.give_items, 'planned', -1); await solve(newT.receive_items, 'planned', 1);
     } else if (oldContracted && !newContracted) {
-        await solve(oldT.give_items, 'planned', 1);
-        await solve(oldT.receive_items, 'planned', -1);
+        await solve(oldT.give_items, 'planned', 1); await solve(oldT.receive_items, 'planned', -1);
     } else if (oldContracted && newContracted) {
         // アイテムが変わった場合の差分調整
-        await solve(oldT.give_items, 'planned', 1);
-        await solve(oldT.receive_items, 'planned', -1);
-        await solve(newT.give_items, 'planned', -1);
-        await solve(newT.receive_items, 'planned', 1);
+        await solve(oldT.give_items, 'planned', 1); await solve(oldT.receive_items, 'planned', -1);
+        await solve(newT.give_items, 'planned', -1); await solve(newT.receive_items, 'planned', 1);
     }
 
     // 2. 実数の同期 (発送/受取チェック)
     if (!oldT?.is_sent && newT.is_sent) await solve(newT.give_items, 'actual', -1);
     else if (oldT?.is_sent && !newT.is_sent) await solve(oldT.give_items, 'actual', 1);
-
     if (!oldT?.is_received && newT.is_received) await solve(newT.receive_items, 'actual', 1);
     else if (oldT?.is_received && !newT.is_received) await solve(oldT.receive_items, 'actual', -1);
 }
@@ -247,7 +238,8 @@ function renderTrades() {
                     <div>渡: ${giveText || 'なし'}</div>
                     <div>受: ${receiveText || 'なし'}</div>
                     <div class="trade-dates">
-                        発送予定日：${t.est_ship_date || '-'} / 受取予定日：${t.est_receive_date || '-'}
+                        発送予定日：<input type="date" value="${t.est_ship_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_ship_date', this.value)">
+                        / 受取予定日：<input type="date" value="${t.est_receive_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_receive_date', this.value)">
                     </div>
                 </div>
                 ${t.image_url ? `<img src="${t.image_url}" class="trade-thumb" onclick="showOverlay('${t.image_url}')">` : ''}
@@ -284,6 +276,13 @@ window.quickCheck = async (id, field, value) => {
     fetchData();
 };
 
+window.quickDateChange = async (id, field, value) => {
+    await sb.from('trades').update({ [field]: value }).eq('id', id);
+    // fetchData(); // 全体更新だと入力中にフォーカスが外れる可能性があるので、ローカルデータのみ更新
+    const t = tradesData.find(x => x.id === id);
+    if (t) t[field] = value;
+};
+
 window.editTrade = (id) => {
     const t = tradesData.find(x => x.id === id);
     if (!t) return;
@@ -297,7 +296,11 @@ window.editTrade = (id) => {
     t.give_items.forEach((item, idx) => { if ($('give-items-list').children[idx]) { $('give-items-list').children[idx].querySelector('.item-id').value = item.id; $('give-items-list').children[idx].querySelector('.item-count').value = item.count; } });
     t.receive_items.forEach((item, idx) => { if ($('receive-items-list').children[idx]) { $('receive-items-list').children[idx].querySelector('.item-id').value = item.id; $('receive-items-list').children[idx].querySelector('.item-count').value = item.count; } });
 
-    if (t.image_url) $('image-preview').innerHTML = `<img src="${t.image_url}">`; else $('image-preview').innerHTML = '';
+    if (t.image_url) {
+        $('image-preview').innerHTML = `<img src="${t.image_url}">`;
+    } else {
+        $('image-preview').innerHTML = '画像がありません';
+    }
     show('trade-modal');
 };
 
