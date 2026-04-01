@@ -131,15 +131,30 @@
                             </select>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label>ステータス</label>
-                        <select id="trade-status">
-                            <option value="お声掛け中">お声掛け中</option>
-                            <option value="仮約束">仮約束</option>
-                            <option value="成約">成約</option>
-                            <option value="発送済">発送済</option>
-                            <option value="受取済">受取済</option>
-                        </select>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>ステータス</label>
+                            <select id="trade-status">
+                                <option value="お声掛け中">お声掛け中</option>
+                                <option value="仮約束">仮約束</option>
+                                <option value="成約">成約</option>
+                            </select>
+                        </div>
+                        <div class="form-group checkbox-group-row">
+                            <label><input type="checkbox" id="trade-is-sent"> 発送済</label>
+                            <label><input type="checkbox" id="trade-is-received"> 受取済</label>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>発送予定日(自分)</label>
+                            <input type="date" id="trade-est-ship-date">
+                        </div>
+                        <div class="form-group">
+                            <label>受取予定日</label>
+                            <input type="date" id="trade-est-receive-date">
+                        </div>
                     </div>
 
                     <div class="trade-items-flex">
@@ -171,16 +186,18 @@
                     </div>
 
                     <div class="form-group">
-                        <label>メモ欄 (自由記入)</label>
-                        <textarea id="trade-memo" rows="3" placeholder="発送予定日、梱包の約束など..."></textarea>
+                        <label>フリーメモ</label>
+                        <textarea id="trade-memo" rows="3" placeholder="発送方法や約束事など"></textarea>
                     </div>
 
                     <div class="form-group">
-                        <label>郵送先設定 (画像アップロード)</label>
+                        <label>画像 (郵送先・グッズなど)</label>
                         <div id="image-upload-area" class="upload-area">
                             <span id="upload-label">画像をタップして選択</span>
                             <input type="file" id="trade-address-img" accept="image/*" class="file-input">
-                            <div id="image-preview" class="image-preview"></div>
+                            <div id="image-preview" class="image-preview-container">
+                                <!-- プレビュー画像 -->
+                            </div>
                         </div>
                     </div>
                     <div class="modal-actions">

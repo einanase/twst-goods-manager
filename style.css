@@ -83,28 +83,72 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.2s;
 }
 
-/* 在庫：超コンパクトグリッド */
+/* 在庫：スリムな1行リスト形式 */
 .goods-compact-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
 }
 
 .goods-card {
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
-    border-radius: 6px; padding: 0.6rem;
-    box-shadow: var(--shadow); position: relative;
-    display: flex; flex-direction: column; gap: 0.4rem;
+    border-radius: 4px;
+    padding: 0.4rem 0.8rem;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: none;
 }
 
-.goods-info h4 { font-size: 0.85rem; color: var(--secondary-text); margin-bottom: 0.1rem; }
-.goods-info .char-name { font-size: 1rem; font-weight: bold; line-height: 1.2; }
+.goods-info {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    overflow: hidden;
+}
+
+.goods-info h4 {
+    font-size: 0.8rem;
+    color: var(--secondary-text);
+    white-space: nowrap;
+}
+
+.goods-info h4::after {
+    content: " /";
+    margin-right: 0.2rem;
+}
+
+.goods-info .char-name {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 .goods-controls {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-top: 0.3rem; padding-top: 0.3rem;
-    border-top: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.8rem;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.goods-count-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(0,0,0,0.2);
+    padding: 2px 8px;
+    border-radius: 20px;
 }
 
 .count-display { font-size: 1.2rem; font-weight: bold; color: var(--accent-gold); }
@@ -130,12 +174,85 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     color: var(--accent-gold); padding: 2px 5px; font-size: 0.8rem; border-radius: 4px;
 }
 
-.trade-details {
-    font-size: 0.9rem; border-left: 2px solid var(--accent-gold); padding-left: 0.6rem;
+.checkbox-group-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    padding-top: 1.2rem;
 }
-.trade-memo-box {
-    margin-top: 0.4rem; font-size: 0.85rem; color: var(--secondary-text);
-    background: rgba(255,255,255,0.05); padding: 0.4rem; border-radius: 4px;
+.checkbox-group-row label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--accent-gold);
+}
+.checkbox-group-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.image-preview-container {
+    width: 100%;
+    min-height: 100px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 1px dashed var(--border-color);
+    margin-top: 0.5rem;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.2);
+    overflow: hidden;
+}
+.image-preview-container img {
+    max-width: 100%;
+    max-height: 200px;
+    border: 1px solid var(--accent-gold);
+}
+
+/* 日付入力のカスタマイズ (ブラウザ依存部分を少し調整) */
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
+/* 一覧画面での追加項目スタイル */
+.trade-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.4rem;
+}
+.trade-tags {
+    display: flex;
+    gap: 0.5rem;
+}
+.tag {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.1);
+    color: var(--secondary-text);
+}
+.tag.done {
+    background: var(--accent-gold);
+    color: var(--bg-color);
+    font-weight: bold;
+}
+.trade-dates {
+    font-size: 0.8rem;
+    color: var(--secondary-text);
+    margin-top: 0.2rem;
+}
+.trade-thumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
 }
 
 /* 取引アイテム複数選択 */
