@@ -21,11 +21,13 @@ async function initAuth() {
 function handleAuthStateChange(session) {
     if (session) {
         currentUser = session.user;
+        $('user-info').textContent = `Logged in as: ${currentUser.email}`;
         hide('auth-section'); show('main-app');
         fetchData();
         checkAndMigrateLocalData();
     } else {
         currentUser = null;
+        $('user-info').textContent = '';
         show('auth-section'); hide('main-app');
     }
 }
@@ -47,8 +49,11 @@ $('signup-btn').onclick = async () => {
 };
 
 $('logout-btn').onclick = async () => {
-    await sb.auth.signOut();
-    window.location.reload();
+    try {
+        await sb.auth.signOut();
+    } finally {
+        window.location.reload();
+    }
 };
 
 // --- データ取得 ---
