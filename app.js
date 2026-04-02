@@ -6,6 +6,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser = null;
 let goodsData = [];
 let tradesData = [];
+let isRecovering = false;
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => $(id)?.classList.remove('hidden');
@@ -38,6 +39,7 @@ window.handlePasswordUpdate = async (e) => {
         $('update-message').textContent = "更新失敗: " + error.message;
     } else {
         alert("合言葉を新しく書き換えました！そのままお入りください。");
+        isRecovering = false;
         hide('update-password-section');
         initAuth(); // 状態を再確認してメイン画面へ
     }
@@ -66,27 +68,33 @@ async function initAuth() {
     // 1. URLハッシュを手動でチェック (リカバリモードの特急検知)
     if (window.location.hash.includes('type=recovery')) {
         console.log("Manual recovery detection!");
+        isRecovering = true;
         hide('auth-section');
         show('update-password-section');
     }
 
     const { data: { session } } = await sb.auth.getSession();
-    if (!window.location.hash.includes('type=recovery')) {
+    if (!isRecovering) {
         handleAuthStateChange(session);
     }
 
     sb.auth.onAuthStateChange((event, session) => {
         console.log("Auth Event:", event);
         if (event === 'PASSWORD_RECOVERY') {
+            isRecovering = true;
             hide('auth-section');
             show('update-password-section');
         } else {
-            handleAuthStateChange(session);
+            // パスワード更新成功後 (isRecovering = false) なら通常どおり表示
+            if (!isRecovering) {
+                handleAuthStateChange(session);
+            }
         }
     });
 }
 
 function handleAuthStateChange(session) {
+    if (isRecovering) return; // リカバリ中はログイン画面を表示しない
     if (session) {
         currentUser = session.user;
         $('user-info').textContent = `Logged in as: ${currentUser.email}`;
