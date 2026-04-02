@@ -11,6 +11,25 @@ const $ = (id) => document.getElementById(id);
 const show = (id) => $(id)?.classList.remove('hidden');
 const hide = (id) => $(id)?.classList.add('hidden');
 
+// --- ログイン・ログアウト ---
+window.handleLogout = async () => {
+    alert('ログアウトを実行します…');
+    try {
+        // 1. UIを即座に戻す
+        handleAuthStateChange(null);
+        // 2. ストレージ消去
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('sb-')) localStorage.removeItem(key);
+        });
+        // 3. サインアウト
+        await sb.auth.signOut();
+    } catch (e) {
+        console.error("Logout Error:", e);
+    } finally {
+        window.location.reload();
+    }
+};
+
 // --- 認証 ---
 async function initAuth() {
     const { data: { session } } = await sb.auth.getSession();
@@ -48,28 +67,6 @@ $('signup-btn').onclick = async () => {
     else $('auth-message').textContent = "アカウントを作成しました。ログインしてください。";
 };
 
-$('logout-btn').addEventListener('click', async () => {
-    alert('ログアウトを実行します…');
-    
-    try {
-        // 1. UIを即座にログイン画面に戻す
-        handleAuthStateChange(null);
-        
-        // 2. ブラウザのストレージに残った認証情報を安全かつ確実に削除する
-        Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('sb-')) {
-                localStorage.removeItem(key);
-            }
-        });
-        
-        // 3. Supabaseにサインアウトを伝える
-        await sb.auth.signOut();
-    } catch (e) {
-        console.error("Logout process error:", e);
-    } finally {
-        window.location.reload();
-    }
-});
 
 // --- データ取得 ---
 async function fetchData() {
