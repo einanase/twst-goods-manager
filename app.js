@@ -48,7 +48,7 @@ $('signup-btn').onclick = async () => {
     else $('auth-message').textContent = "アカウントを作成しました。ログインしてください。";
 };
 
-$('logout-btn').onclick = async () => {
+$('logout-btn').addEventListener('click', async () => {
     alert('ログアウトを実行します…');
     
     try {
@@ -62,15 +62,14 @@ $('logout-btn').onclick = async () => {
             }
         });
         
-        // 3. Supabaseにサインアウトを伝える（通信エラーが起きても構わない）
+        // 3. Supabaseにサインアウトを伝える
         await sb.auth.signOut();
     } catch (e) {
         console.error("Logout process error:", e);
     } finally {
-        // 4. 何が起きても最後に必ずリロードして状態を脱出する
         window.location.reload();
     }
-};
+});
 
 // --- データ取得 ---
 async function fetchData() {
@@ -385,7 +384,10 @@ window.deleteTrade = async (id) => {
 // --- その他UI ---
 $('nav-inventory').onclick = () => { show('inventory-section'); hide('trades-section'); $('nav-inventory').classList.add('active'); $('nav-trades').classList.remove('active'); };
 $('nav-trades').onclick = () => { hide('inventory-section'); show('trades-section'); $('nav-inventory').classList.remove('active'); $('nav-trades').classList.add('active'); };
-document.querySelectorAll('.cancel-btn').forEach(b => b.onclick = () => { hide('goods-modal'); hide('trade-modal'); });
+document.querySelectorAll('.cancel-btn').forEach(b => {
+    if (b.id === 'logout-btn') return; // ログアウトボタンは除外
+    b.onclick = () => { hide('goods-modal'); hide('trade-modal'); };
+});
 window.showOverlay = (url) => { $('overlay-img').src = url; show('image-overlay'); };
 $('image-overlay').onclick = () => hide('image-overlay');
 $('goods-search').oninput = renderInventory;
