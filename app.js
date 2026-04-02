@@ -46,7 +46,9 @@ $('signup-btn').onclick = async () => {
     else $('auth-message').textContent = "アカウントを作成しました。ログインしてください。";
 };
 
-$('logout-btn').onclick = () => sb.auth.signOut();
+$('logout-btn').onclick = async () => {
+    await sb.auth.signOut();
+};
 
 // --- データ取得 ---
 async function fetchData() {
@@ -328,8 +330,12 @@ window.editTrade = (id) => {
 window.deleteTrade = async (id) => {
     if (confirm('削除しますか？')) {
         const t = tradesData.find(x => x.id === id);
-        if (t && t.status === '成約') {
-            const undoT = JSON.parse(JSON.stringify(t)); undoT.status = 'キャンセル';
+        if (t) {
+            // 削除前に、在庫変動をすべて逆再生する
+            const undoT = JSON.parse(JSON.stringify(t));
+            undoT.status = 'キャンセル';
+            undoT.is_sent = false;
+            undoT.is_received = false;
             await syncStock(t, undoT);
         }
         await sb.from('trades').delete().eq('id', id);
