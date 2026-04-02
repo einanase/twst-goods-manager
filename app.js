@@ -30,6 +30,19 @@ window.handlePasswordReset = async () => {
     }
 };
 
+window.handlePasswordUpdate = async (e) => {
+    e.preventDefault();
+    const newPassword = $('new-password').value;
+    const { error } = await sb.auth.updateUser({ password: newPassword });
+    if (error) {
+        $('update-message').textContent = "更新失敗: " + error.message;
+    } else {
+        alert("合言葉を新しく書き換えました！そのままお入りください。");
+        hide('update-password-section');
+        initAuth(); // 状態を再確認してメイン画面へ
+    }
+};
+
 window.handleLogout = async () => {
     alert('ログアウトを実行します…');
     try {
@@ -52,7 +65,15 @@ window.handleLogout = async () => {
 async function initAuth() {
     const { data: { session } } = await sb.auth.getSession();
     handleAuthStateChange(session);
-    sb.auth.onAuthStateChange((_event, session) => handleAuthStateChange(session));
+    sb.auth.onAuthStateChange((event, session) => {
+        console.log("Auth Event:", event);
+        if (event === 'PASSWORD_RECOVERY') {
+            hide('auth-section');
+            show('update-password-section');
+        } else {
+            handleAuthStateChange(session);
+        }
+    });
 }
 
 function handleAuthStateChange(session) {

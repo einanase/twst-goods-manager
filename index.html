@@ -39,6 +39,24 @@
             </div>
         </div>
 
+        <!-- パスワード再設定セクション (リカバリ時に表示) -->
+        <div id="update-password-section" class="auth-overlay hidden">
+            <div class="glass-panel main-auth-panel">
+                <h3>新しい合言葉を刻む（再設定）</h3>
+                <p>新しいパスワードを入力してください。</p>
+                <form id="update-password-form" onsubmit="handlePasswordUpdate(event)">
+                    <div class="form-group">
+                        <label>新しいパスワード</label>
+                        <input type="password" id="new-password" placeholder="••••••••" required>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="submit" class="confirm-btn">合言葉を更新する</button>
+                    </div>
+                </form>
+                <div id="update-message" class="auth-message"></div>
+            </div>
+        </div>
+
         <!-- メインアプリ (ログイン後に表示) -->
         <div id="main-app" class="hidden">
             <nav class="main-nav">
