@@ -63,8 +63,18 @@ window.handleLogout = async () => {
 
 // --- 認証 ---
 async function initAuth() {
+    // 1. URLハッシュを手動でチェック (リカバリモードの特急検知)
+    if (window.location.hash.includes('type=recovery')) {
+        console.log("Manual recovery detection!");
+        hide('auth-section');
+        show('update-password-section');
+    }
+
     const { data: { session } } = await sb.auth.getSession();
-    handleAuthStateChange(session);
+    if (!window.location.hash.includes('type=recovery')) {
+        handleAuthStateChange(session);
+    }
+
     sb.auth.onAuthStateChange((event, session) => {
         console.log("Auth Event:", event);
         if (event === 'PASSWORD_RECOVERY') {
