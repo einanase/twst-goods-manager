@@ -49,9 +49,21 @@ $('signup-btn').onclick = async () => {
 };
 
 $('logout-btn').onclick = async () => {
+    // 1. まずUIを即座にログイン画面に戻す
+    handleAuthStateChange(null);
+    
+    // 2. ブラウザのストレージに残った認証情報を手動で直接削除する（最強の確実性）
+    for (let key in localStorage) {
+        if (key.startsWith('sb-')) {
+            localStorage.removeItem(key);
+        }
+    }
+    
+    // 3. Supabaseにサインアウトを伝える
     try {
         await sb.auth.signOut();
     } finally {
+        // 4. 何が起きても最後に必ずリロードして状態をリセットする
         window.location.reload();
     }
 };
