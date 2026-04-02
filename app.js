@@ -21,8 +21,13 @@ window.handlePasswordReset = async () => {
     const { error } = await sb.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.href,
     });
-    if (error) $('auth-message').textContent = "リセット失敗: " + error.message;
-    else $('auth-message').textContent = "再設定メールを送信しました。メールを確認してください。";
+    if (error) {
+        $('auth-message').textContent = "リセット失敗: " + error.message;
+    } else {
+        const msg = "再設定メールを送信しました！メールボックスを確認して、新しい合言葉（パスワード）を決めてくださいね。";
+        $('auth-message').textContent = msg;
+        alert(msg);
+    }
 };
 
 window.handleLogout = async () => {
