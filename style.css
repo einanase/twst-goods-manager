@@ -293,13 +293,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 .trade-thumb {
     width: 230px;
-    height: 230px;
-    object-fit: cover;
+    height: auto;
+    max-height: 230px;
+    object-fit: contain;
     border: 2px solid var(--accent-gold);
     border-radius: 12px;
     cursor: pointer;
     margin-left: 1rem;
     box-shadow: 0 4px 30px rgba(0,0,0,0.6);
+    background: rgba(0,0,0,0.3);
 }
 
 /* 取引アイテム複数選択 */
