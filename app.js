@@ -48,6 +48,7 @@ $('signup-btn').onclick = async () => {
 
 $('logout-btn').onclick = async () => {
     await sb.auth.signOut();
+    window.location.reload();
 };
 
 // --- データ取得 ---
@@ -62,10 +63,27 @@ async function fetchData() {
 }
 
 // --- 在庫管理 ---
+async function resetPlannedCounts() {
+    if (!confirm('全ての「予定数」を「実数」と同じ値にリセットしますか？（消した取引が反映されない場合に有効です）')) return;
+    for (const g of goodsData) {
+        await sb.from('goods').update({ planned_count: g.count }).eq('id', g.id);
+    }
+    fetchData();
+}
+
 function renderInventory() {
     const list = $('goods-list');
     const q = $('goods-search').value.toLowerCase();
     list.innerHTML = '';
+    
+    // 一括リセットボタンを追加
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'nav-btn mini';
+    resetBtn.style = 'margin-bottom: 1rem; width: 100%;';
+    resetBtn.textContent = '在庫の計算ズレを直す（予定数を実数に合わせる）';
+    resetBtn.onclick = resetPlannedCounts;
+    list.appendChild(resetBtn);
+
     goodsData.filter(g => g.char.toLowerCase().includes(q) || g.type.toLowerCase().includes(q)).forEach(g => {
         const card = document.createElement('div');
         card.className = 'goods-card single-line';
