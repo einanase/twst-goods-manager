@@ -12,6 +12,19 @@ const show = (id) => $(id)?.classList.remove('hidden');
 const hide = (id) => $(id)?.classList.add('hidden');
 
 // --- ログイン・ログアウト ---
+window.handlePasswordReset = async () => {
+    const email = $('auth-email').value;
+    if (!email) {
+        alert('先にメールアドレスを入力してくださいね');
+        return;
+    }
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href,
+    });
+    if (error) $('auth-message').textContent = "リセット失敗: " + error.message;
+    else $('auth-message').textContent = "再設定メールを送信しました。メールを確認してください。";
+};
+
 window.handleLogout = async () => {
     alert('ログアウトを実行します…');
     try {
