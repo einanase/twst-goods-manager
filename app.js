@@ -49,21 +49,25 @@ $('signup-btn').onclick = async () => {
 };
 
 $('logout-btn').onclick = async () => {
-    // 1. まずUIを即座にログイン画面に戻す
-    handleAuthStateChange(null);
+    alert('ログアウトを実行します…');
     
-    // 2. ブラウザのストレージに残った認証情報を手動で直接削除する（最強の確実性）
-    for (let key in localStorage) {
-        if (key.startsWith('sb-')) {
-            localStorage.removeItem(key);
-        }
-    }
-    
-    // 3. Supabaseにサインアウトを伝える
     try {
+        // 1. UIを即座にログイン画面に戻す
+        handleAuthStateChange(null);
+        
+        // 2. ブラウザのストレージに残った認証情報を安全かつ確実に削除する
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('sb-')) {
+                localStorage.removeItem(key);
+            }
+        });
+        
+        // 3. Supabaseにサインアウトを伝える（通信エラーが起きても構わない）
         await sb.auth.signOut();
+    } catch (e) {
+        console.error("Logout process error:", e);
     } finally {
-        // 4. 何が起きても最後に必ずリロードして状態をリセットする
+        // 4. 何が起きても最後に必ずリロードして状態を脱出する
         window.location.reload();
     }
 };
