@@ -236,8 +236,8 @@ function renderTrades() {
     list.innerHTML = '';
     tradesData.filter(t => filter === 'all' || t.status === filter).forEach(t => {
         const card = document.createElement('div'); card.className = 'trade-card';
-        const giveText = t.give_items.map(i => { const g = goodsData.find(gx => gx.id===i.id); return g ? `${g.char}×${i.count}` : '?'; }).join(', ');
-        const receiveText = t.receive_items.map(i => { const g = goodsData.find(gx => gx.id===i.id); return g ? `${g.char}×${i.count}` : '?'; }).join(', ');
+        const giveText = t.give_items.map(i => { const g = goodsData.find(gx => gx.id===i.id); return g ? `${g.type} / ${g.char}×${i.count}` : '?'; }).join(', ');
+        const receiveText = t.receive_items.map(i => { const g = goodsData.find(gx => gx.id===i.id); return g ? `${g.type} / ${g.char}×${i.count}` : '?'; }).join(', ');
         
         const isTradeContracted = t.status === '成約';
 
