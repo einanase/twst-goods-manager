@@ -174,6 +174,7 @@ $('trade-form').onsubmit = async (e) => {
             imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl;
         } else {
             console.error("画像アップロードエラー:", uploadError);
+            alert("画像アップロードに失敗しました: " + uploadError.message + "\nストレージのポリシー(INSERT)を確認してください。");
         }
     }
 
