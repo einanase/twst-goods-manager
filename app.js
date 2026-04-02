@@ -248,29 +248,33 @@ function renderTrades() {
                     ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
                 </select>
             </div>
-            <div class="trade-details" style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <div>
-                    <div>渡: ${giveText || 'なし'}</div>
-                    <div>受: ${receiveText || 'なし'}</div>
+            <div class="trade-main-content">
+                <div class="trade-text-info">
+                    <div class="trade-items">
+                        <div>渡: ${giveText || 'なし'}</div>
+                        <div>受: ${receiveText || 'なし'}</div>
+                    </div>
                     <div class="trade-dates">
                         発送予定日：<input type="date" value="${t.est_ship_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_ship_date', this.value)">
                         / 受取予定日：<input type="date" value="${t.est_receive_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_receive_date', this.value)">
                     </div>
+                    <div class="trade-tags">
+                        <label class="tag ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
+                            <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済
+                        </label>
+                        <label class="tag ${t.is_received?'done':''} ${!isTradeContracted?'disabled':''}">
+                            <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済
+                        </label>
+                    </div>
+                    ${t.memo ? `<div class="trade-memo-box">${t.memo}</div>` : ''}
+                    <div class="card-menu">
+                        <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
+                        <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
+                    </div>
                 </div>
-                ${t.image_url ? `<img src="${t.image_url}" class="trade-thumb" onclick="showOverlay('${t.image_url}')">` : ''}
-            </div>
-            <div class="trade-tags" style="margin-top:8px;">
-                <label class="tag ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
-                    <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済
-                </label>
-                <label class="tag ${t.is_received?'done':''} ${!isTradeContracted?'disabled':''}">
-                    <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済
-                </label>
-            </div>
-            ${t.memo ? `<div class="trade-memo-box">${t.memo}</div>` : ''}
-            <div class="card-menu">
-                <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
-                <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
+                <div class="trade-visual-info">
+                    ${t.image_url ? `<img src="${t.image_url}" class="trade-thumb" onclick="showOverlay('${t.image_url}')">` : ''}
+                </div>
             </div>
         `;
         list.appendChild(card);

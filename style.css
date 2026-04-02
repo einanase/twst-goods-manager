@@ -258,17 +258,42 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     color: var(--secondary-text);
     margin-top: 0.2rem;
 }
+.trade-main-content {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1rem;
+    min-height: 230px;
+}
+.trade-text-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.trade-items {
+    margin-bottom: 0.5rem;
+}
+.trade-dates {
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+.trade-tags {
+    margin-bottom: 0.5rem;
+}
+.card-menu {
+    margin-top: auto;
+    display: flex;
+    gap: 0.5rem;
+}
 .trade-thumb {
-    width: 350px;
-    height: 350px;
+    width: 230px;
+    height: 230px;
     object-fit: cover;
     border: 2px solid var(--accent-gold);
     border-radius: 12px;
     cursor: pointer;
     margin-left: 1rem;
     box-shadow: 0 4px 30px rgba(0,0,0,0.6);
-    align-self: center;
-    max-width: 100%;
 }
 
 /* 取引アイテム複数選択 */
