@@ -662,15 +662,32 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     box-shadow: 0 0 20px rgba(212, 175, 55, 0.5) !important;
 }
 
-/* 画像形式の情報行（1行化） */
+/* 画像形式の情報行（縦並びの2カラム） */
 .gic-counts {
+    margin-top: 0.5rem;
+}
+.gic-count-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr; /* 実数のほうがボタンがあるので少し広く */
+    gap: 0.4rem;
+    text-align: center;
+}
+.gic-count-col {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    align-items: center;
+}
+.gic-label {
+    font-size: 0.75rem;
+    color: var(--secondary-text);
+    margin-bottom: 2px;
+}
+.gic-num {
+    font-size: 1.1rem;
+    font-family: 'Cinzel', serif;
 }
 @media (max-width: 600px) {
-    .gic-counts { font-size: 0.8rem; }
-    .gic-count-row { display: flex; justify-content: space-between; align-items: center; }
+    .gic-num { font-size: 1rem; }
 }
 
 /* リスト形式の改行対応 */

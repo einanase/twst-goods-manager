@@ -201,16 +201,19 @@ function renderInventory() {
                         <span style="color: var(--accent-gold); font-size: 1rem;">${g.char}</span>
                     </div>
                     <div class="gic-counts">
-                        <div class="gic-count-row">
-                            <span><span class="gic-label">予定数</span> <span class="gic-num planned">${g.planned_count ?? g.count}</span></span>
-                            <span>
+                        <div class="gic-count-grid">
+                            <div class="gic-count-col">
+                                <span class="gic-label">予定数</span>
+                                <span class="gic-num planned">${g.planned_count ?? g.count}</span>
+                            </div>
+                            <div class="gic-count-col">
                                 <span class="gic-label">実数</span>
-                                <span class="gic-controls">
+                                <div class="gic-controls">
                                     <button class="count-btn" onclick="updateCount('${g.id}', -1); event.stopPropagation();">-</button>
                                     <span class="gic-num actual">${g.count}</span>
                                     <button class="count-btn" onclick="updateCount('${g.id}', 1); event.stopPropagation();">+</button>
-                                </span>
-                            </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -722,6 +725,7 @@ function switchSection(section) {
 
 $('nav-inventory').onclick = () => switchSection('inventory');
 $('nav-trades').onclick = () => switchSection('trades');
+
 
 function handleAuthStateChange(session) {
     if (isRecovering) return;
