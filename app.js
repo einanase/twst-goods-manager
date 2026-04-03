@@ -7,6 +7,7 @@ let currentUser = null;
 let goodsData = [];
 let tradesData = [];
 let isRecovering = false;
+let currentInventoryView = localStorage.getItem('twst_inventory_view') || 'list';
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => $(id)?.classList.remove('hidden');
@@ -154,6 +155,21 @@ async function fetchData() {
 }
 
 // --- 在庫管理 ---
+window.setInventoryView = (view) => {
+    currentInventoryView = view;
+    localStorage.setItem('twst_inventory_view', view);
+    
+    // UIボタンの状態更新
+    if (view === 'gallery') {
+        $('view-gallery-btn').classList.add('active');
+        $('view-list-btn').classList.remove('active');
+    } else {
+        $('view-list-btn').classList.add('active');
+        $('view-gallery-btn').classList.remove('active');
+    }
+    renderInventory();
+};
+
 async function resetPlannedCounts() {
     if (!confirm('全ての「予定数」を「実数」と同じ値にリセットしますか？（消した取引が反映されない場合に有効です）')) return;
     for (const g of goodsData) {
@@ -167,34 +183,74 @@ function renderInventory() {
     const q = $('goods-search').value.toLowerCase();
     list.innerHTML = '';
     
-    goodsData.filter(g => g.char.toLowerCase().includes(q) || g.type.toLowerCase().includes(q)).forEach(g => {
-        const card = document.createElement('div');
-        card.className = 'goods-card single-line';
-        card.innerHTML = `
-            <div class="goods-info">
-                <span class="goods-name">
-                    <span class="goods-type-label">${g.type}</span> / ${g.char}
-                </span>
-            </div>
-            <div class="goods-controls-wrap">
-                <div class="count-item">
-                    <span class="count-label">予定数</span>
-                    <span class="count-num count-planned">${g.planned_count ?? g.count}</span>
+    const filteredGoods = goodsData.filter(g => g.char.toLowerCase().includes(q) || g.type.toLowerCase().includes(q));
+
+    if (currentInventoryView === 'gallery') {
+        list.className = 'goods-gallery-grid';
+        filteredGoods.forEach(g => {
+            const card = document.createElement('div');
+            card.className = 'goods-image-card';
+            card.innerHTML = `
+                <div class="gic-image-wrap" onclick="showOverlay('${g.image_url || ''}')">
+                    ${g.image_url ? `<img src="${g.image_url}" class="gic-img">` : '<span class="gic-no-img">No Image</span>'}
                 </div>
-                <div class="count-item actual-control">
-                    <span class="count-label">実数</span>
-                    <button class="count-btn" onclick="updateCount('${g.id}', -1)">-</button>
-                    <span class="count-num">${g.count}</span>
-                    <button class="count-btn" onclick="updateCount('${g.id}', 1)">+</button>
+                <div class="gic-info">
+                    <span class="gic-name">
+                        <span class="goods-type-label">${g.type}</span> / ${g.char}
+                    </span>
+                    <div class="gic-counts">
+                        <div class="gic-count-row">
+                            <span class="gic-label">予定数</span>
+                            <span class="gic-num planned">${g.planned_count ?? g.count}</span>
+                        </div>
+                        <div class="gic-count-row">
+                            <span class="gic-label">実数</span>
+                            <div class="gic-controls">
+                                <button class="count-btn" onclick="updateCount('${g.id}', -1)">-</button>
+                                <span class="gic-num actual">${g.count}</span>
+                                <button class="count-btn" onclick="updateCount('${g.id}', 1)">+</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-menu">
+                <div class="gic-footer">
                     <button class="nav-btn mini" onclick="editGoods('${g.id}')">編集</button>
                     <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}')">削除</button>
                 </div>
-            </div>
-        `;
-        list.appendChild(card);
-    });
+            `;
+            list.appendChild(card);
+        });
+    } else {
+        list.className = 'goods-compact-grid';
+        filteredGoods.forEach(g => {
+            const card = document.createElement('div');
+            card.className = 'goods-card single-line';
+            card.innerHTML = `
+                <div class="goods-info">
+                    <span class="goods-name">
+                        <span class="goods-type-label">${g.type}</span> / ${g.char}
+                    </span>
+                </div>
+                <div class="goods-controls-wrap">
+                    <div class="count-item">
+                        <span class="count-label">予定数</span>
+                        <span class="count-num count-planned">${g.planned_count ?? g.count}</span>
+                    </div>
+                    <div class="count-item actual-control">
+                        <span class="count-label">実数</span>
+                        <button class="count-btn" onclick="updateCount('${g.id}', -1)">-</button>
+                        <span class="count-num">${g.count}</span>
+                        <button class="count-btn" onclick="updateCount('${g.id}', 1)">+</button>
+                    </div>
+                    <div class="card-menu">
+                        <button class="nav-btn mini" onclick="editGoods('${g.id}')">編集</button>
+                        <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}')">削除</button>
+                    </div>
+                </div>
+            `;
+            list.appendChild(card);
+        });
+    }
 
     // 一括リセットボタンを一番下に追加 (指示により誤操作防止)
     const resetBtn = document.createElement('button');
@@ -214,12 +270,60 @@ async function updateCount(id, delta) {
     fetchData();
 }
 
-$('add-goods-btn').onclick = () => { $('goods-form').reset(); $('goods-id-edit').value=''; show('goods-modal'); };
+window.removeGoodsImage = () => {
+    $('goods-img-input').value = '';
+    $('goods-img-preview').src = '';
+    hide('goods-img-preview-container');
+    $('goods-img-preview').dataset.url = ''; 
+};
+
+$('goods-img-input').onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const url = URL.createObjectURL(file);
+        $('goods-img-preview').src = url;
+        $('goods-img-preview').dataset.url = ''; 
+        show('goods-img-preview-container');
+    }
+};
+
+$('add-goods-btn').onclick = () => { 
+    $('goods-form').reset(); 
+    $('goods-id-edit').value=''; 
+    removeGoodsImage();
+    show('goods-modal'); 
+};
+
 $('goods-form').onsubmit = async (e) => {
     e.preventDefault();
     const id = $('goods-id-edit').value;
     const count = parseInt($('goods-count').value);
-    const data = { user_id: currentUser.id, type: $('goods-type').value, char: $('goods-char').value, count: count, planned_count: count };
+    
+    let imageUrl = $('goods-img-preview').dataset.url || null;
+    if ($('goods-img-preview-container').classList.contains('hidden')) {
+        imageUrl = null;
+    }
+
+    const file = $('goods-img-input').files[0];
+    if (file) {
+        const path = `inventory/${currentUser.id}/${Date.now()}_${file.name}`;
+        const { data: uploadData, error: uploadError } = await sb.storage.from('mailing-images').upload(path, file);
+        if (!uploadError) {
+            imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl;
+        } else {
+            console.error("画像アップロードエラー:", uploadError);
+            alert("画像アップロードに失敗しました");
+        }
+    }
+
+    const data = { 
+        user_id: currentUser.id, 
+        type: $('goods-type').value, 
+        char: $('goods-char').value, 
+        count: count, 
+        planned_count: count,
+        image_url: imageUrl
+    };
     if (id) await sb.from('goods').update(data).eq('id', id);
     else await sb.from('goods').insert([data]);
     hide('goods-modal'); fetchData();
@@ -228,7 +332,18 @@ $('goods-form').onsubmit = async (e) => {
 window.editGoods = (id) => {
     const g = goodsData.find(x => x.id === id);
     if (!g) return;
-    $('goods-id-edit').value = g.id; $('goods-type').value = g.type; $('goods-char').value = g.char; $('goods-count').value = g.count;
+    $('goods-id-edit').value = g.id; 
+    $('goods-type').value = g.type; 
+    $('goods-char').value = g.char; 
+    $('goods-count').value = g.count;
+    
+    if (g.image_url) {
+        $('goods-img-preview').src = g.image_url;
+        $('goods-img-preview').dataset.url = g.image_url;
+        show('goods-img-preview-container');
+    } else {
+        removeGoodsImage();
+    }
     show('goods-modal');
 };
 
@@ -597,7 +712,11 @@ function handleAuthStateChange(session) {
 }
 document.querySelectorAll('.cancel-btn').forEach(b => {
     if (b.id === 'logout-btn') return; // ログアウトボタンは除外
-    b.onclick = () => { hide('goods-modal'); hide('trade-modal'); };
+    b.onclick = () => { 
+        hide('goods-modal'); 
+        hide('trade-modal'); 
+        removeGoodsImage(); // ここで画像プレビューをリセットしておく
+    };
 });
 window.showOverlay = (url) => { $('overlay-img').src = url; show('image-overlay'); };
 $('image-overlay').onclick = () => hide('image-overlay');
@@ -612,5 +731,6 @@ async function checkAndMigrateLocalData() {
         localStorage.removeItem('twst_goods'); fetchData();
     }
 }
-
+// 初期化時にビューを設定
+setInventoryView(currentInventoryView);
 initAuth();

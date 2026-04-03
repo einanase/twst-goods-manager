@@ -81,6 +81,13 @@
                             <button id="add-goods-btn" class="primary-btn">+ グッズ追加</button>
                         </div>
                     </header>
+                    <div class="view-mode-selector">
+                        <span class="view-label">表示形式：</span>
+                        <div class="view-toggle">
+                            <button id="view-list-btn" class="toggle-btn active" onclick="setInventoryView('list')">リスト形式</button>
+                            <button id="view-gallery-btn" class="toggle-btn" onclick="setInventoryView('gallery')">画像形式</button>
+                        </div>
+                    </div>
                     <div id="goods-list" class="goods-compact-grid">
                         <!-- 動的に生成 -->
                     </div>
@@ -131,6 +138,16 @@
                     <div class="form-group">
                         <label>在庫数</label>
                         <input type="number" id="goods-count" value="0" min="0" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>グッズ画像</label>
+                        <div class="upload-wrapper">
+                            <input type="file" id="goods-img-input" accept="image/*" class="file-input">
+                            <div id="goods-img-preview-container" class="preview-container hidden">
+                                <img id="goods-img-preview" class="modal-preview-img">
+                                <button type="button" class="remove-img-btn" onclick="removeGoodsImage()">×</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-actions">
                         <button type="button" class="cancel-btn">キャンセル</button>
