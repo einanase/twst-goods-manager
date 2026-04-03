@@ -251,14 +251,7 @@ function renderInventory() {
             list.appendChild(card);
         });
     }
-
-    // 一括リセットボタンを一番下に追加 (指示により誤操作防止)
-    const resetBtn = document.createElement('button');
-    resetBtn.className = 'nav-btn mini';
-    resetBtn.style = 'margin-top: 1.5rem; margin-bottom: 2rem; width: 100%; opacity: 0.7;';
-    resetBtn.textContent = '在庫の計算ズレを直す（予定数を実数に合わせる）';
-    resetBtn.onclick = resetPlannedCounts;
-    list.appendChild(resetBtn);
+    // 一括リセットボタンはindex.html側に静的に配置しました。
 }
 
 async function updateCount(id, delta) {
