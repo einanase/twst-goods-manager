@@ -681,12 +681,14 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     font-size: 0.75rem;
     color: var(--secondary-text);
     margin-bottom: 2px;
+    white-space: nowrap; /* 途中で改行されないように */
 }
 .gic-num {
     font-size: 1.1rem;
     font-family: 'Cinzel', serif;
 }
 @media (max-width: 600px) {
+    .gic-label { font-size: 0.7rem; }
     .gic-num { font-size: 1rem; }
 }
 
