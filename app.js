@@ -299,13 +299,14 @@ $('goods-form').onsubmit = async (e) => {
 
     const file = $('goods-img-input').files[0];
     if (file) {
-        const path = `inventory/${currentUser.id}/${Date.now()}_${file.name}`;
+        const path = `${currentUser.id}/inventory/${Date.now()}_${file.name}`;
         const { data: uploadData, error: uploadError } = await sb.storage.from('mailing-images').upload(path, file);
         if (!uploadError) {
             imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl;
         } else {
             console.error("画像アップロードエラー:", uploadError);
             alert("画像アップロードに失敗しました");
+            return; // 処理を中断
         }
     }
 
@@ -422,6 +423,7 @@ $('trade-form').onsubmit = async (e) => {
         } else {
             console.error("画像アップロードエラー:", uploadError);
             alert("画像アップロードに失敗しました");
+            return; // 処理を中断
         }
     }
 
