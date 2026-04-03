@@ -277,10 +277,11 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     display: grid;
     grid-template-columns: auto auto 1fr auto;
     grid-template-areas: 
-        "name    actions . image"
-        "status  status  . image"
-        "body    body    body body";
-    gap: 0.2rem 1.2rem;
+        "name    name    name  ."
+        "actions actions .     image"
+        "status  status  .     image"
+        "body    body    body  body";
+    gap: 0.4rem 1.2rem;
     align-items: center;
 }
 .tg-name { grid-area: name; min-width: 0; }
