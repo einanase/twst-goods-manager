@@ -41,6 +41,8 @@ window.handlePasswordUpdate = async (e) => {
         alert("合言葉を新しく書き換えました！そのままお入りください。");
         isRecovering = false;
         hide('update-password-section');
+        // 更新が成功したのでURLを綺麗にする
+        history.replaceState(null, null, window.location.pathname + window.location.search);
         initAuth(); // 状態を再確認してメイン画面へ
     }
 };
@@ -84,8 +86,8 @@ async function initAuth() {
         isRecovering = true;
         hide('auth-section');
         show('update-password-section');
-        // リカバリモード中もURLを綺麗にする
-        history.replaceState(null, null, window.location.pathname + window.location.search);
+        // 【修正】セッション確立に必要なトークンが含まれている可能性があるため、
+        // ここではURL（ハッシュ）を消さないようにします。
     }
 
     const { data: { session } } = await sb.auth.getSession();
