@@ -35,6 +35,27 @@ h1, h2, h3, .logo {
 
 .hidden { display: none !important; }
 
+/* フォーム共通スタイルを「宵闇のゴールド」で統一 */
+input[type="text"], input[type="number"], input[type="date"], select, textarea {
+    background: rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid var(--accent-gold) !important;
+    color: #fff !important;
+    padding: 8px 12px;
+    border-radius: 6px;
+    outline: none;
+    font-family: inherit;
+    transition: 0.3s;
+}
+input:focus, select:focus, textarea:focus {
+    background: rgba(0, 0, 0, 0.6) !important;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+    border-color: #fff !important;
+}
+/* Chrome/Safariなどの日付入力アイコンを白っぽく */
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+}
+
 /* ログイン・認証 */
 .auth-overlay {
     position: fixed;
@@ -717,25 +738,32 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 /* --------------------------------------------------
    モーダルアクション ＆ ファイル入力（モバイル最適化）
 -------------------------------------------------- */
-.modal-actions {
-    display: flex; gap: 1rem; margin-top: 1.5rem;
-}
-.confirm-btn, .cancel-btn {
+/* モーダル内のアクションボタン（これのみ特大にする） */
+.modal-actions .confirm-btn, .modal-actions .cancel-btn {
     flex: 1; padding: 14px !important; border-radius: 12px !important;
     font-weight: bold !important; font-size: 1.05rem !important; cursor: pointer;
     transition: 0.3s;
+    border: none !important;
 }
-.confirm-btn {
+.modal-actions .confirm-btn {
     background: linear-gradient(135deg, var(--accent-gold), #b8860b) !important;
-    color: #000 !important; border: none !important;
+    color: #000 !important;
     box-shadow: 0 4px 15px rgba(212,175,55,0.3);
 }
-.confirm-btn:active { transform: translateY(2px); box-shadow: none; }
-
-.cancel-btn {
+.modal-actions .cancel-btn {
     background: rgba(255,255,255,0.05) !important;
     color: var(--secondary-text) !important;
     border: 1px solid rgba(255,255,255,0.2) !important;
+}
+
+/* 一覧などのミニボタンとしてのキャンセルボタンはnav-btnに合わせる */
+.nav-btn.cancel-btn {
+    background: transparent !important;
+    border: 1px solid var(--accent-gold) !important;
+    color: var(--accent-gold) !important;
+}
+.nav-btn.cancel-btn:hover {
+    background: rgba(212, 175, 55, 0.1) !important;
 }
 
 /* ファイル入力の装飾 */
