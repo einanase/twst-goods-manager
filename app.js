@@ -348,7 +348,7 @@ function renderTrades() {
     list.innerHTML = '';
     tradesData
         .filter(t => filter === 'all' || t.status === filter)
-        .filter(t => t.name.toLowerCase().includes(q))
+        .filter(t => (t.name || "").toLowerCase().includes(q))
         .forEach(t => {
             const card = document.createElement('div'); card.className = 'trade-card';
             
