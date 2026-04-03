@@ -276,20 +276,20 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 .trade-card-grid {
     display: grid;
     grid-template-columns: auto auto 1fr auto;
-    grid-template-rows: repeat(3, min-content) auto;
+    grid-template-rows: repeat(3, min-content) 1fr;
     grid-template-areas: 
         "name    name    name  ."
         "actions actions .     image"
         "status  status  .     image"
-        "body    body    body  body";
-    gap: 0.1rem 1.2rem;
+        "body    body    body  image";
+    gap: 0 1.2rem;
     align-items: flex-start;
 }
-.tg-name { grid-area: name; min-width: 0; line-height: 1.1; margin-bottom: 0px; }
-.tg-actions { grid-area: actions; display: flex; gap: 0.4rem; padding-top: 0; }
-.tg-status { grid-area: status; padding-top: 0; }
+.tg-name { grid-area: name; min-width: 0; line-height: 1.1; margin-bottom: 0.2rem; }
+.tg-actions { grid-area: actions; display: flex; gap: 0.4rem; padding-bottom: 0.2rem; }
+.tg-status { grid-area: status; padding-bottom: 0.4rem; }
 .tg-image { grid-area: image; align-self: start; padding-top: 0.1rem; }
-.tg-body { grid-area: body; margin-top: 0.1rem; }
+.tg-body { grid-area: body; margin-top: 0; }
 
 .trade-main-img {
     width: 220px;
