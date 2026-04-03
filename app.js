@@ -65,12 +65,27 @@ window.handleLogout = async () => {
 
 // --- 認証 ---
 async function initAuth() {
-    // 1. URLハッシュを手動でチェック (リカバリモードの特急検知)
-    if (window.location.hash.includes('type=recovery')) {
+    // 1. URLハッシュを手動でチェック
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+
+    // エラーの検知 (otp_expiredなど、URLにエラーが含まれる場合)
+    const errorMsg = params.get('error_description') || params.get('error');
+    if (errorMsg) {
+        const decodedMsg = decodeURIComponent(errorMsg.replace(/\+/g, ' '));
+        $('auth-message').textContent = "認証エラー: " + decodedMsg;
+        // ユーザーが混乱しないよう、ハッシュをURLから消去
+        history.replaceState(null, null, window.location.pathname + window.location.search);
+    }
+
+    // リカバリモードの特急検知 (またはハッシュ直接チェック)
+    if (hash.includes('type=recovery') || params.get('type') === 'recovery') {
         console.log("Manual recovery detection!");
         isRecovering = true;
         hide('auth-section');
         show('update-password-section');
+        // リカバリモード中もURLを綺麗にする
+        history.replaceState(null, null, window.location.pathname + window.location.search);
     }
 
     const { data: { session } } = await sb.auth.getSession();
