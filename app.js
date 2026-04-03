@@ -355,10 +355,10 @@ function renderTrades() {
             const formatItem = i => {
                 const g = goodsData.find(gx => gx.id === i.id);
                 if (!g) return '?';
-                return `<span class="trade-item-line"><span class="t-type">${g.type}</span> / <span class="t-char">${g.char}</span> <span class="t-count">×${i.count}</span></span>`;
+                return `<span class="trade-item-line"><span class="t-item-content"><span class="t-type">${g.type}</span> / <span class="t-char">${g.char}</span></span><span class="t-count">×${i.count}</span></span>`;
             };
-            const giveHtml = t.give_items.map(formatItem).join(''); // カンマ除去
-            const receiveHtml = t.receive_items.map(formatItem).join(''); // カンマ除去
+            const giveHtml = t.give_items.map(formatItem).join('');
+            const receiveHtml = t.receive_items.map(formatItem).join('');
             
             const isTradeContracted = t.status === '成約';
 
@@ -377,12 +377,18 @@ function renderTrades() {
                     </div>
                 </div>
 
-                <!-- 【ブラウザ・デスクトップ専用】ヘッダー：従来の配置へ戻す -->
-                <div class="trade-header desktop-only">
-                    <span class="trade-user">${t.name}</span>
-                    <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
-                        ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
-                    </select>
+                <!-- 【ブラウザ・デスクトップ専用】ヘッダー：名前・ステータス・編集削除を一括りで右寄せへ -->
+                <div class="trade-header-desktop desktop-only">
+                    <div class="t-header-desktop-left">
+                        <span class="trade-user">${t.name}</span>
+                        <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
+                            ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="t-header-desktop-actions">
+                        <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
+                        <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
+                    </div>
                 </div>
                 
                 <div class="trade-status-row-top mobile-only">
@@ -404,19 +410,23 @@ function renderTrades() {
                             </div>
                         </div>
 
-                        <!-- デスクトップ用：日付とタグ -->
+                        <!-- 【ブラウザ・デスクトップ専用】日付のすぐ隣にチェックボックス -->
                         <div class="trade-info-extra desktop-only">
-                            <div class="trade-dates">
-                                発送予定：<input type="date" value="${t.est_ship_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_ship_date', this.value)">
-                                / 受取予定：<input type="date" value="${t.est_receive_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_receive_date', this.value)">
-                            </div>
-                            <div class="trade-tags">
-                                <label class="tag ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
-                                    <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済
-                                </label>
-                                <label class="tag ${t.is_received?'done':''} ${!isTradeContracted?'disabled':''}">
-                                    <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済
-                                </label>
+                            <div class="trade-dates-desktop">
+                                <div class="date-check-pair">
+                                    <span class="d-label">発送予定:</span>
+                                    <input type="date" value="${t.est_ship_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_ship_date', this.value)">
+                                    <label class="tag-inline ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
+                                        <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済
+                                    </label>
+                                </div>
+                                <div class="date-check-pair">
+                                    <span class="d-label">受取予定:</span>
+                                    <input type="date" value="${t.est_receive_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_receive_date', this.value)">
+                                    <label class="tag-inline ${t.is_received?'done':''} ${!isTradeContracted?'disabled':''}">
+                                        <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
@@ -442,13 +452,7 @@ function renderTrades() {
                             </div>
                         </div>
 
-                        ${t.memo ? `<div class="trade-memo-box">${t.memo}</div>` : ''}
-
-                        <!-- デスクトップ版：ボタンを最下部へ戻す -->
-                        <div class="card-menu desktop-only">
-                            <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
-                            <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
-                        </div>
+                        ${t.memo ? `<div class="trade-memo-box"><span class="memo-label">メモ：</span>${t.memo}</div>` : ''}
                     </div>
 
                     <!-- デスクトップ版：右側に大きな画像 (指示①によりスマホでは非表示) -->
