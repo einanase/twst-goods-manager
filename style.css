@@ -390,9 +390,11 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     .search-input { flex: 1; width: auto; min-width: 0; }
 
     /* スマホ版の調整 */
-    .trade-card-inline-wrap { flex-direction: column-reverse; gap: 0.8rem; }
-    .t-header-compact { margin-bottom: 0.4rem; }
-    .trade-main-img { width: 100px; max-height: 100px; align-self: flex-end; margin-top: -10px; }
+    .trade-card-inline-wrap { flex-direction: column-reverse; gap: 0.5rem; }
+    .t-header-compact { margin-bottom: 0.2rem; border: none !important; }
+    .t-title-row { gap: 0.4rem; margin-bottom: 0; }
+    .t-status-row-compact { margin-top: -2px; }
+    .trade-main-img { width: 100px; max-height: 100px; align-self: flex-end; margin-top: -5px; }
 
     .trade-item-line { font-size: 0.8rem; justify-content: space-between; }
     .t-type { font-size: 0.75rem; }
