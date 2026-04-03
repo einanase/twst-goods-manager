@@ -363,38 +363,25 @@ function renderTrades() {
             const isTradeContracted = t.status === '成約';
 
             card.innerHTML = `
-                <!-- 【スマホ専用】ヘッダー：指示①⑥により画像とボタンを上段へ -->
-                <div class="t-mobile-header mobile-only">
-                    <div class="t-header-left">
-                        <span class="trade-user">${t.name}</span>
-                        <div class="t-header-actions">
-                            <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
-                            <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
+                <div class="trade-card-header">
+                    <div class="t-header-main">
+                        <div class="t-name-actions">
+                            <span class="trade-user">${t.name}</span>
+                            <div class="t-action-btns">
+                                <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
+                                <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
+                            </div>
                         </div>
+                        ${t.image_url ? `
+                        <div class="t-header-img-wrap">
+                            <img src="${t.image_url}" class="trade-mini-thumb" onclick="showOverlay('${t.image_url}')">
+                        </div>` : ''}
                     </div>
-                    <div class="t-header-right">
-                        ${t.image_url ? `<img src="${t.image_url}" class="trade-mini-thumb" onclick="showOverlay('${t.image_url}')">` : ''}
-                    </div>
-                </div>
-
-                <!-- 【ブラウザ・デスクトップ専用】ヘッダー：名前・ステータス・編集削除を一括りで右寄せへ -->
-                <div class="trade-header-desktop desktop-only">
-                    <div class="t-header-desktop-left">
-                        <span class="trade-user">${t.name}</span>
+                    <div class="t-header-status-row">
                         <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
                             ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
                         </select>
                     </div>
-                    <div class="t-header-desktop-actions">
-                        <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
-                        <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
-                    </div>
-                </div>
-                
-                <div class="trade-status-row-top mobile-only">
-                    <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
-                        ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
-                    </select>
                 </div>
 
                 <div class="t-content-layout">

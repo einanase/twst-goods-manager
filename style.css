@@ -228,17 +228,45 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     font-size: 0.85rem;
 }
 
-/* デスクトップ用ヘッダー (指示②: 名前とステータスの右にボタン) */
-.trade-header-desktop {
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    border-bottom: 2px solid var(--border-color) !important;
-    padding-bottom: 0.8rem !important;
-    margin-bottom: 0.5rem !important;
+/* 統一ヘッダー (指示: 1段目 名前・ボタン・画像 / 2段目 ステータス) */
+.trade-card-header {
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.8rem;
+    margin-bottom: 0.8rem;
 }
-.t-header-desktop-left { display: flex; align-items: center; gap: 1rem; }
-.t-header-desktop-actions { display: flex; gap: 0.6rem; }
+.t-header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+.t-name-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex: 1;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+.t-action-btns {
+    display: flex;
+    gap: 0.4rem;
+}
+.t-header-status-row {
+    margin-top: 0.6rem;
+}
+.t-header-img-wrap {
+    flex-shrink: 0;
+}
+.trade-mini-thumb {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--accent-gold);
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
 
 /* デスクトップ用日付配置 (指示④: 日付の横にチェックボックス) */
 .trade-dates-desktop {
@@ -363,8 +391,11 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     .header-actions { width: 100%; display: flex; gap: 0.6rem; align-items: stretch; }
     .search-input { flex: 1; width: auto; min-width: 0; }
 
-    .t-mobile-header.mobile-only { display: flex !important; justify-content: space-between !important; align-items: flex-start !important; }
-    .date-check-row { display: flex !important; }
+    /* 統一ヘッダーのスマホ調整 */
+    .trade-card-header { margin-bottom: 0.5rem; }
+    .trade-user { font-size: 1rem; }
+    .t-name-actions { gap: 0.5rem; }
+    .nav-btn.mini { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
 
     .trade-item-line { font-size: 0.8rem; justify-content: space-between; }
     .t-type { font-size: 0.75rem; }
