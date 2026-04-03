@@ -344,76 +344,121 @@ async function syncStock(oldT, newT) {
 function renderTrades() {
     const list = $('trades-list');
     const filter = $('status-filter').value;
+    const q = $('trade-search').value.toLowerCase();
     list.innerHTML = '';
-    tradesData.filter(t => filter === 'all' || t.status === filter).forEach(t => {
-        const card = document.createElement('div'); card.className = 'trade-card';
-        
-        const formatItem = i => {
-            const g = goodsData.find(gx => gx.id === i.id);
-            if (!g) return '?';
-            return `<span class="trade-item-line"><span class="t-type">${g.type}</span> / <span class="t-char">${g.char}</span> <span class="t-count">×${i.count}</span></span>`;
-        };
-        const giveHtml = t.give_items.map(formatItem).join(', ');
-        const receiveHtml = t.receive_items.map(formatItem).join(', ');
-        
-        const isTradeContracted = t.status === '成約';
-
-        card.innerHTML = `
-            <div class="trade-new-header">
-                <div class="t-header-left">
-                    <span class="trade-user">${t.name}</span>
-                    <div class="t-header-actions">
-                        <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
-                        <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
-                    </div>
-                </div>
-                <div class="t-header-right">
-                    ${t.image_url ? `<img src="${t.image_url}" class="trade-mini-thumb" onclick="showOverlay('${t.image_url}')">` : ''}
-                </div>
-            </div>
+    tradesData
+        .filter(t => filter === 'all' || t.status === filter)
+        .filter(t => t.name.toLowerCase().includes(q))
+        .forEach(t => {
+            const card = document.createElement('div'); card.className = 'trade-card';
             
-            <div class="trade-status-row-top">
-                <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
-                    ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
-                </select>
-            </div>
+            const formatItem = i => {
+                const g = goodsData.find(gx => gx.id === i.id);
+                if (!g) return '?';
+                return `<span class="trade-item-line"><span class="t-type">${g.type}</span> / <span class="t-char">${g.char}</span> <span class="t-count">×${i.count}</span></span>`;
+            };
+            const giveHtml = t.give_items.map(formatItem).join(', ');
+            const receiveHtml = t.receive_items.map(formatItem).join(', ');
+            
+            const isTradeContracted = t.status === '成約';
 
-            <div class="trade-items-area">
-                <div class="trade-item-group">
-                    <label class="trade-label give">渡すもの</label>
-                    <div class="trade-item-list">${giveHtml || 'なし'}</div>
-                </div>
-                <div class="trade-item-group">
-                    <label class="trade-label receive">受けるもの</label>
-                    <div class="trade-item-list">${receiveHtml || 'なし'}</div>
-                </div>
-            </div>
-
-            <div class="trade-footer-grid">
-                <div class="date-check-row">
-                    <div class="date-input-wrap">
-                        <span class="d-label">発送予:</span>
-                        <input type="date" value="${t.est_ship_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_ship_date', this.value)">
+            card.innerHTML = `
+                <!-- 【スマホ専用】ヘッダー：指示①⑥により画像とボタンを上段へ -->
+                <div class="t-mobile-header mobile-only">
+                    <div class="t-header-left">
+                        <span class="trade-user">${t.name}</span>
+                        <div class="t-header-actions">
+                            <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
+                            <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
+                        </div>
                     </div>
-                    <label class="tag-check ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
-                        <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済
-                    </label>
-                </div>
-                <div class="date-check-row">
-                    <div class="date-input-wrap">
-                        <span class="d-label">受取予:</span>
-                        <input type="date" value="${t.est_receive_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_receive_date', this.value)">
+                    <div class="t-header-right">
+                        ${t.image_url ? `<img src="${t.image_url}" class="trade-mini-thumb" onclick="showOverlay('${t.image_url}')">` : ''}
                     </div>
-                    <label class="tag-check ${t.is_received?'done':''} ${!isTradeContracted?'disabled':''}">
-                        <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済
-                    </label>
                 </div>
-            </div>
 
-            ${t.memo ? `<div class="trade-memo-box">${t.memo}</div>` : ''}
-        `;
-        list.appendChild(card);
-    });
+                <!-- 【ブラウザ・デスクトップ専用】ヘッダー：従来の配置へ戻す -->
+                <div class="trade-header desktop-only">
+                    <span class="trade-user">${t.name}</span>
+                    <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
+                        ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
+                    </select>
+                </div>
+                
+                <div class="trade-status-row-top mobile-only">
+                    <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
+                        ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
+                    </select>
+                </div>
+
+                <div class="t-content-layout">
+                    <div class="trade-text-info">
+                        <div class="trade-items-area">
+                            <div class="trade-item-group">
+                                <label class="trade-label give">渡すもの</label>
+                                <div class="trade-item-list">${giveHtml || 'なし'}</div>
+                            </div>
+                            <div class="trade-item-group">
+                                <label class="trade-label receive">受けるもの</label>
+                                <div class="trade-item-list">${receiveHtml || 'なし'}</div>
+                            </div>
+                        </div>
+
+                        <!-- デスクトップ用：日付とタグ -->
+                        <div class="trade-info-extra desktop-only">
+                            <div class="trade-dates">
+                                発送予定：<input type="date" value="${t.est_ship_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_ship_date', this.value)">
+                                / 受取予定：<input type="date" value="${t.est_receive_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_receive_date', this.value)">
+                            </div>
+                            <div class="trade-tags">
+                                <label class="tag ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
+                                    <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済
+                                </label>
+                                <label class="tag ${t.is_received?'done':''} ${!isTradeContracted?'disabled':''}">
+                                    <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- スマホ用：新レイアウト適用 -->
+                        <div class="trade-footer-grid mobile-only">
+                            <div class="date-check-row">
+                                <div class="date-input-wrap">
+                                    <span class="d-label">発送予:</span>
+                                    <input type="date" value="${t.est_ship_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_ship_date', this.value)">
+                                </div>
+                                <label class="tag-check ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
+                                    <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済
+                                </label>
+                            </div>
+                            <div class="date-check-row">
+                                <div class="date-input-wrap">
+                                    <span class="d-label">受取予:</span>
+                                    <input type="date" value="${t.est_receive_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_receive_date', this.value)">
+                                </div>
+                                <label class="tag-check ${t.is_received?'done':''} ${!isTradeContracted?'disabled':''}">
+                                    <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済
+                                </label>
+                            </div>
+                        </div>
+
+                        ${t.memo ? `<div class="trade-memo-box">${t.memo}</div>` : ''}
+
+                        <!-- デスクトップ版：ボタンを最下部へ戻す -->
+                        <div class="card-menu desktop-only">
+                            <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
+                            <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
+                        </div>
+                    </div>
+
+                    <!-- デスクトップ版：右側に大きな画像 (指示①によりスマホでは非表示) -->
+                    <div class="trade-visual-info desktop-only">
+                         ${t.image_url ? `<img src="${t.image_url}" class="trade-thumb" onclick="showOverlay('${t.image_url}')">` : ''}
+                    </div>
+                </div>
+            `;
+            list.appendChild(card);
+        });
 }
 
 window.quickStatusChange = async (id, newS) => {
@@ -486,6 +531,7 @@ document.querySelectorAll('.cancel-btn').forEach(b => {
 window.showOverlay = (url) => { $('overlay-img').src = url; show('image-overlay'); };
 $('image-overlay').onclick = () => hide('image-overlay');
 $('goods-search').oninput = renderInventory;
+$('trade-search').oninput = renderTrades; // 追加
 $('status-filter').onchange = renderTrades;
 
 async function checkAndMigrateLocalData() {

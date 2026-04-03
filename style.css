@@ -436,8 +436,38 @@ input, select, textarea { width: 100%; background: rgba(0,0,0,0.3); border: 1px 
 #overlay-img { max-width: 90%; max-height: 90%; border: 2px solid var(--accent-gold); }
 .close-overlay { position: absolute; top: 15px; right: 20px; color: white; font-size: 2.5rem; cursor: pointer; }
 
+/* モバイル・デスクトップ出し分け */
+.mobile-only { display: none !important; }
+.desktop-only { display: block !important; }
+
+/* レイアウト共通 */
+.t-content-layout {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+.trade-text-info { flex: 1; min-width: 0; }
+.trade-visual-info { flex-shrink: 0; }
+
+.trade-info-extra {
+    margin: 0.8rem 0;
+    padding: 0.8rem;
+    background: rgba(0,0,0,0.2);
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+.trade-info-extra .trade-dates { margin-bottom: 0.5rem; }
+
 /* スマホ対応 */
 @media (max-width: 600px) {
+    .mobile-only { display: block !important; }
+    .desktop-only { display: none !important; }
+
+    /* flexが必要な特殊な要素 */
+    .t-mobile-header.mobile-only { display: flex !important; }
+    .date-check-row { display: flex !important; }
+
     /* ナビゲーションの改善 */
     .main-nav {
         flex-direction: column;
@@ -516,36 +546,33 @@ input, select, textarea { width: 100%; background: rgba(0,0,0,0.3); border: 1px 
         gap: 1rem;
     }
 
-    /* 取引カードの画像とテキストを縦に */
-    .trade-main-content {
-        flex-direction: column;
-        min-height: auto;
+    /* 指示①④⑤⑥をスマホ向けに適用 */
+    .t-mobile-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.8rem;
     }
-    .trade-thumb {
-        width: 100%;
-        max-width: 100%;
-        margin: 1rem 0 0 0;
-        height: auto;
-        max-height: 300px;
+    .trade-mini-thumb {
+        width: 70px;
+        height: 70px;
+        object-fit: cover;
+        border: 2px solid var(--accent-gold);
+        border-radius: 6px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4);
     }
-    .trade-text-info {
-        width: 100%;
-    }
-    .trade-dates {
+    .trade-footer-grid {
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
-        background: rgba(0,0,0,0.2);
-        padding: 0.6rem;
-        border-radius: 4px;
-        margin-top: 0.5rem;
+        gap: 0.6rem;
+        margin-top: 0.8rem;
+        padding-top: 0.8rem;
+        border-top: 1px solid var(--border-color);
     }
 
-    /* 取引情報の複数入力 */
+    /* その他スマホ調整 */
     .trade-items-flex { grid-template-columns: 1fr; }
     .form-row { grid-template-columns: 1fr; }
-
-    /* モーダル */
     .modal-content {
         padding: 1rem;
         width: 98%;
