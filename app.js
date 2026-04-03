@@ -167,14 +167,6 @@ function renderInventory() {
     const q = $('goods-search').value.toLowerCase();
     list.innerHTML = '';
     
-    // 一括リセットボタンを追加
-    const resetBtn = document.createElement('button');
-    resetBtn.className = 'nav-btn mini';
-    resetBtn.style = 'margin-bottom: 1rem; width: 100%;';
-    resetBtn.textContent = '在庫の計算ズレを直す（予定数を実数に合わせる）';
-    resetBtn.onclick = resetPlannedCounts;
-    list.appendChild(resetBtn);
-
     goodsData.filter(g => g.char.toLowerCase().includes(q) || g.type.toLowerCase().includes(q)).forEach(g => {
         const card = document.createElement('div');
         card.className = 'goods-card single-line';
@@ -201,6 +193,14 @@ function renderInventory() {
         `;
         list.appendChild(card);
     });
+
+    // 一括リセットボタンを一番下に追加 (指示により誤操作防止)
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'nav-btn mini';
+    resetBtn.style = 'margin-top: 1.5rem; margin-bottom: 2rem; width: 100%; opacity: 0.7;';
+    resetBtn.textContent = '在庫の計算ズレを直す（予定数を実数に合わせる）';
+    resetBtn.onclick = resetPlannedCounts;
+    list.appendChild(resetBtn);
 }
 
 async function updateCount(id, delta) {
