@@ -357,8 +357,8 @@ function renderTrades() {
                 if (!g) return '?';
                 return `<span class="trade-item-line"><span class="t-type">${g.type}</span> / <span class="t-char">${g.char}</span> <span class="t-count">×${i.count}</span></span>`;
             };
-            const giveHtml = t.give_items.map(formatItem).join(', ');
-            const receiveHtml = t.receive_items.map(formatItem).join(', ');
+            const giveHtml = t.give_items.map(formatItem).join(''); // カンマ除去
+            const receiveHtml = t.receive_items.map(formatItem).join(''); // カンマ除去
             
             const isTradeContracted = t.status === '成約';
 
@@ -424,7 +424,7 @@ function renderTrades() {
                         <div class="trade-footer-grid mobile-only">
                             <div class="date-check-row">
                                 <div class="date-input-wrap">
-                                    <span class="d-label">発送予:</span>
+                                    <span class="d-label">発送予定:</span>
                                     <input type="date" value="${t.est_ship_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_ship_date', this.value)">
                                 </div>
                                 <label class="tag-check ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
@@ -433,7 +433,7 @@ function renderTrades() {
                             </div>
                             <div class="date-check-row">
                                 <div class="date-input-wrap">
-                                    <span class="d-label">受取予:</span>
+                                    <span class="d-label">受取予定:</span>
                                     <input type="date" value="${t.est_receive_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_receive_date', this.value)">
                                 </div>
                                 <label class="tag-check ${t.is_received?'done':''} ${!isTradeContracted?'disabled':''}">
@@ -521,9 +521,38 @@ window.deleteTrade = async (id) => {
     }
 };
 
-// --- その他UI ---
-$('nav-inventory').onclick = () => { show('inventory-section'); hide('trades-section'); $('nav-inventory').classList.add('active'); $('nav-trades').classList.remove('active'); };
-$('nav-trades').onclick = () => { hide('inventory-section'); show('trades-section'); $('nav-inventory').classList.remove('active'); $('nav-trades').classList.add('active'); };
+// --- その他UI & ページ維持 ---
+function switchSection(section) {
+    if (section === 'inventory') {
+        show('inventory-section'); hide('trades-section');
+        $('nav-inventory').classList.add('active'); $('nav-trades').classList.remove('active');
+    } else {
+        hide('inventory-section'); show('trades-section');
+        $('nav-inventory').classList.remove('active'); $('nav-trades').classList.add('active');
+    }
+    localStorage.setItem('twst_active_section', section);
+}
+
+$('nav-inventory').onclick = () => switchSection('inventory');
+$('nav-trades').onclick = () => switchSection('trades');
+
+function handleAuthStateChange(session) {
+    if (isRecovering) return;
+    if (session) {
+        currentUser = session.user;
+        $('user-info').textContent = `Logged in as: ${currentUser.email}`;
+        hide('auth-section'); show('main-app');
+        fetchData();
+        checkAndMigrateLocalData();
+        // 最後にいた画面を復元
+        const saved = localStorage.getItem('twst_active_section') || 'inventory';
+        switchSection(saved);
+    } else {
+        currentUser = null;
+        $('user-info').textContent = '';
+        show('auth-section'); hide('main-app');
+    }
+}
 document.querySelectorAll('.cancel-btn').forEach(b => {
     if (b.id === 'logout-btn') return; // ログアウトボタンは除外
     b.onclick = () => { hide('goods-modal'); hide('trade-modal'); };

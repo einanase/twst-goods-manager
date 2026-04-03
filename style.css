@@ -355,7 +355,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .trade-label.receive { background: #1b4d3e; color: #fff; box-shadow: 0 0 8px rgba(27,77,62,0.4); }
 
 .trade-item-list { font-size: 0.95rem; line-height: 1.6; }
-.trade-item-line { display: block; padding: 2px 0; }
+.trade-item-line { 
+    display: block; 
+    padding: 2px 0; 
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .t-type { color: var(--secondary-text); font-size: 0.8rem; }
 .t-char { color: var(--accent-gold); font-weight: bold; text-shadow: 0 0 5px rgba(212,175,55,0.3); }
 .t-count { 
@@ -376,29 +382,29 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 .date-check-row {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
-    gap: 0.8rem;
+    gap: 0.6rem;
 }
 .date-input-wrap {
-    flex: 1;
+    flex: 0 1 auto;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
 }
 .d-label { font-size: 0.75rem; color: var(--secondary-text); white-space: nowrap; }
 
 .tag-check {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.85rem;
-    padding: 0.5rem 0.8rem;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    padding: 0.4rem 0.6rem;
     background: rgba(255,255,255,0.05);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     cursor: pointer;
-    min-width: 100px;
+    min-width: 90px;
     justify-content: center;
     transition: 0.2s;
 }
