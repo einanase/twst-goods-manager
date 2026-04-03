@@ -436,6 +436,18 @@ input, select, textarea { width: 100%; background: rgba(0,0,0,0.3); border: 1px 
 #overlay-img { max-width: 90%; max-height: 90%; border: 2px solid var(--accent-gold); }
 .close-overlay { position: absolute; top: 15px; right: 20px; color: white; font-size: 2.5rem; cursor: pointer; }
 
+.trade-thumb {
+    width: 230px;
+    height: auto;
+    max-height: 230px;
+    object-fit: contain;
+    border: 2px solid var(--accent-gold);
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.6);
+    background: rgba(0,0,0,0.3);
+}
+
 /* モバイル・デスクトップ出し分け */
 .mobile-only { display: none !important; }
 .desktop-only { display: block !important; }
