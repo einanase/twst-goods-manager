@@ -180,7 +180,14 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 .trade-label.give { background: #8b0000; color: #fff; box-shadow: 0 0 8px rgba(139,0,0,0.4); }
 .trade-label.receive { background: #1b4d3e; color: #fff; box-shadow: 0 0 8px rgba(27,77,62,0.4); }
 
-.trade-user { font-weight: bold; color: var(--accent-gold); font-size: 1.1rem; }
+.trade-user { 
+    font-weight: bold; 
+    color: var(--accent-gold); 
+    font-size: 1.1rem; 
+    white-space: normal; 
+    word-break: break-all;
+    overflow-wrap: break-word;
+}
 
 /* 一覧からのステータス変更用セレクト */
 .status-quick-change {
@@ -267,6 +274,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     display: flex !important;
     align-items: center !important;
     gap: 1.2rem !important;
+    flex-wrap: wrap;
 }
 .tag-inline {
     display: flex;
@@ -297,6 +305,8 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     border: 1px solid var(--border-color);
     font-size: 0.95rem;
     line-height: 1.6;
+    word-break: break-all;
+    overflow-wrap: break-word;
 }
 .memo-label {
     font-weight: bold !important;
