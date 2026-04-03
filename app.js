@@ -363,23 +363,26 @@ function renderTrades() {
             const isTradeContracted = t.status === '成約';
 
             card.innerHTML = `
-                <div class="trade-card-inline-wrap">
-                    <div class="t-left-column">
-                        <div class="t-header-compact">
-                            <div class="t-title-row">
-                                <span class="trade-user">${t.name}</span>
-                                <div class="t-action-btns">
-                                    <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
-                                    <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
-                                </div>
-                            </div>
-                            <div class="t-status-row-compact">
-                                <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
-                                    ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
-                                </select>
-                            </div>
+                <div class="trade-card-grid">
+                    <div class="tg-name">
+                        <span class="trade-user">${t.name}</span>
+                    </div>
+                    <div class="tg-actions">
+                        <div class="t-action-btns">
+                            <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
+                            <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
                         </div>
-
+                    </div>
+                    <div class="tg-status">
+                        <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
+                            ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
+                        </select>
+                    </div>
+                    ${t.image_url ? `
+                    <div class="tg-image">
+                        <img src="${t.image_url}" class="trade-main-img" onclick="showOverlay('${t.image_url}')">
+                    </div>` : ''}
+                    <div class="tg-body">
                         <div class="trade-items-area">
                             <div class="trade-item-group">
                                 <label class="trade-label give">渡すもの</label>
@@ -435,10 +438,6 @@ function renderTrades() {
 
                         ${t.memo ? `<div class="trade-memo-box"><span class="memo-label">メモ：</span>${t.memo}</div>` : ''}
                     </div>
-                    ${t.image_url ? `
-                    <div class="t-right-column">
-                        <img src="${t.image_url}" class="trade-main-img" onclick="showOverlay('${t.image_url}')">
-                    </div>` : ''}
                 </div>
             `;
             list.appendChild(card);
