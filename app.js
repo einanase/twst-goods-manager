@@ -299,13 +299,17 @@ $('goods-form').onsubmit = async (e) => {
 
     const file = $('goods-img-input').files[0];
     if (file) {
-        const path = `${currentUser.id}/inventory/${Date.now()}_${file.name}`;
+        // ファイル名の拡張子を取得
+        const ext = file.name.split('.').pop();
+        // 日本語や記号を避けるため、一意なIDで保存
+        const path = `${currentUser.id}/inv_${Date.now()}.${ext}`;
+        
         const { data: uploadData, error: uploadError } = await sb.storage.from('mailing-images').upload(path, file);
         if (!uploadError) {
             imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl;
         } else {
-            console.error("画像アップロードエラー:", uploadError);
-            alert("画像アップロードに失敗しました");
+            console.error("画像アップロード詳細エラー:", uploadError);
+            alert("画像アップロードに失敗しました\nエラー詳細：" + (uploadError.message || JSON.stringify(uploadError)));
             return; // 処理を中断
         }
     }
@@ -416,13 +420,14 @@ $('trade-form').onsubmit = async (e) => {
 
     const file = $('trade-address-img').files[0];
     if (file) {
-        const path = `${currentUser.id}/${Date.now()}_${file.name}`;
+        const ext = file.name.split('.').pop();
+        const path = `${currentUser.id}/trd_${Date.now()}.${ext}`;
         const { data: uploadData, error: uploadError } = await sb.storage.from('mailing-images').upload(path, file);
         if (!uploadError) {
             imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl;
         } else {
-            console.error("画像アップロードエラー:", uploadError);
-            alert("画像アップロードに失敗しました");
+            console.error("画像アップロード詳細エラー:", uploadError);
+            alert("画像アップロードに失敗しました\nエラー詳細：" + (uploadError.message || JSON.stringify(uploadError)));
             return; // 処理を中断
         }
     }
