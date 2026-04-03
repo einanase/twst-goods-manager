@@ -363,29 +363,23 @@ function renderTrades() {
             const isTradeContracted = t.status === '成約';
 
             card.innerHTML = `
-                <div class="trade-card-header">
-                    <div class="t-header-main">
-                        <div class="t-name-actions">
-                            <span class="trade-user">${t.name}</span>
-                            <div class="t-action-btns">
-                                <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
-                                <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
+                <div class="trade-card-inline-wrap">
+                    <div class="t-left-column">
+                        <div class="t-header-compact">
+                            <div class="t-title-row">
+                                <span class="trade-user">${t.name}</span>
+                                <div class="t-action-btns">
+                                    <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
+                                    <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
+                                </div>
+                            </div>
+                            <div class="t-status-row-compact">
+                                <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
+                                    ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
+                                </select>
                             </div>
                         </div>
-                        ${t.image_url ? `
-                        <div class="t-header-img-wrap">
-                            <img src="${t.image_url}" class="trade-mini-thumb" onclick="showOverlay('${t.image_url}')">
-                        </div>` : ''}
-                    </div>
-                    <div class="t-header-status-row">
-                        <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
-                            ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
-                        </select>
-                    </div>
-                </div>
 
-                <div class="t-content-layout">
-                    <div class="trade-text-info">
                         <div class="trade-items-area">
                             <div class="trade-item-group">
                                 <label class="trade-label give">渡すもの</label>
@@ -397,7 +391,7 @@ function renderTrades() {
                             </div>
                         </div>
 
-                        <!-- 【ブラウザ・デスクトップ専用】日付のすぐ隣にチェックボックス -->
+                        <!-- ブラウザ・デスクトップ専用の日付・チェック表示 -->
                         <div class="trade-info-extra desktop-only">
                             <div class="trade-dates-desktop">
                                 <div class="date-check-pair">
@@ -417,7 +411,7 @@ function renderTrades() {
                             </div>
                         </div>
 
-                        <!-- スマホ用：新レイアウト適用 -->
+                        <!-- スマホ用：フッター配置 -->
                         <div class="trade-footer-grid mobile-only">
                             <div class="date-check-row">
                                 <div class="date-input-wrap">
@@ -441,11 +435,10 @@ function renderTrades() {
 
                         ${t.memo ? `<div class="trade-memo-box"><span class="memo-label">メモ：</span>${t.memo}</div>` : ''}
                     </div>
-
-                    <!-- デスクトップ版：右側に大きな画像 (指示①によりスマホでは非表示) -->
-                    <div class="trade-visual-info desktop-only">
-                         ${t.image_url ? `<img src="${t.image_url}" class="trade-thumb" onclick="showOverlay('${t.image_url}')">` : ''}
-                    </div>
+                    ${t.image_url ? `
+                    <div class="t-right-column">
+                        <img src="${t.image_url}" class="trade-main-img" onclick="showOverlay('${t.image_url}')">
+                    </div>` : ''}
                 </div>
             `;
             list.appendChild(card);
