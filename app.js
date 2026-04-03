@@ -378,12 +378,22 @@ function updateTradeItemSelects() {
             row.className = 'item-row-compact';
             row.innerHTML = `
                 <select class="item-id"><option value="">--未選択--</option>${options}</select>
-                <input type="number" class="item-count" value="1" min="1" placeholder="個数">
+                <div class="trade-count-control">
+                    <button type="button" class="count-btn" onclick="adjustTradeItemCount(this, -1)">-</button>
+                    <span class="item-count">0</span>
+                    <button type="button" class="count-btn" onclick="adjustTradeItemCount(this, 1)">+</button>
+                </div>
             `;
             $(cid).appendChild(row);
         }
     });
 }
+
+window.adjustTradeItemCount = (btn, delta) => {
+    const span = btn.parentElement.querySelector('.item-count');
+    const newVal = Math.max(0, parseInt(span.textContent) + delta);
+    span.textContent = newVal;
+};
 
 // 画像削除機能
 window.removeTradeImage = () => {
@@ -425,8 +435,8 @@ $('trade-status').onchange = (e) => toggleModalCheckboxes(e.target.value);
 $('trade-form').onsubmit = async (e) => {
     e.preventDefault();
     const id = $('trade-id').value;
-    const giveItems = Array.from($('give-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').value) })).filter(i => i.id);
-    const receiveItems = Array.from($('receive-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').value) })).filter(i => i.id);
+    const giveItems = Array.from($('give-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').textContent) })).filter(i => i.id && i.count > 0);
+    const receiveItems = Array.from($('receive-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').textContent) })).filter(i => i.id && i.count > 0);
     
     const oldTrade = id ? tradesData.find(t => t.id === id) : null;
     
@@ -672,13 +682,13 @@ window.editTrade = (id) => {
     t.give_items.forEach((item, idx) => { 
         if (giveList[idx]) { 
             giveList[idx].querySelector('.item-id').value = item.id; 
-            giveList[idx].querySelector('.item-count').value = item.count; 
+            giveList[idx].querySelector('.item-count').textContent = item.count; 
         } 
     });
     t.receive_items.forEach((item, idx) => { 
         if (receiveList[idx]) { 
             receiveList[idx].querySelector('.item-id').value = item.id; 
-            receiveList[idx].querySelector('.item-count').value = item.count; 
+            receiveList[idx].querySelector('.item-count').textContent = item.count; 
         } 
     });
 
