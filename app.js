@@ -238,23 +238,41 @@ function updateTradeItemSelects() {
     ['give-items-list', 'receive-items-list'].forEach(cid => {
         $(cid).innerHTML = '';
         for (let i = 0; i < 5; i++) {
-            const row = document.createElement('div'); row.className = 'item-row';
-            row.innerHTML = `<select class="item-id"><option value="">--未選択--</option>${options}</select><input type="number" class="item-count" value="1" min="1">`;
+            const row = document.createElement('div'); 
+            row.className = 'item-row-compact';
+            row.innerHTML = `
+                <select class="item-id"><option value="">--未選択--</option>${options}</select>
+                <input type="number" class="item-count" value="1" min="1" placeholder="個数">
+            `;
             $(cid).appendChild(row);
         }
     });
 }
 
+// 画像削除機能
+window.removeTradeImage = () => {
+    $('trade-address-img').value = '';
+    $('trade-img-preview').src = '';
+    hide('trade-img-preview-container');
+    // 編集中の場合はURLをクリアしたことを記憶させるためのフラグとしても使える
+    $('trade-img-preview').dataset.url = ''; 
+};
+
 $('trade-address-img').onchange = (e) => {
     const file = e.target.files[0];
     if (file) {
         const url = URL.createObjectURL(file);
-        $('image-preview').innerHTML = `<img src="${url}">`;
+        $('trade-img-preview').src = url;
+        $('trade-img-preview').dataset.url = ''; // 新規アップロード時は既存URLをクリア
+        show('trade-img-preview-container');
     }
 };
 
 $('add-trade-btn').onclick = () => {
-    $('trade-form').reset(); $('trade-id').value = ''; $('image-preview').innerHTML = ''; updateTradeItemSelects(); 
+    $('trade-form').reset(); $('trade-id').value = ''; 
+    $('trade-img-preview').src = ''; $('trade-img-preview').dataset.url = '';
+    hide('trade-img-preview-container');
+    updateTradeItemSelects(); 
     toggleModalCheckboxes('お声掛け中');
     show('trade-modal');
 };
@@ -275,7 +293,15 @@ $('trade-form').onsubmit = async (e) => {
     const receiveItems = Array.from($('receive-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').value) })).filter(i => i.id);
     
     const oldTrade = id ? tradesData.find(t => t.id === id) : null;
-    let imageUrl = oldTrade?.image_url || null;
+    
+    // image_urlの決定ロジック
+    // 1. プレビューにdataset.urlがあればそれを使う（変更なし）
+    // 2. プレビューが非表示ならnull（削除済み）
+    // 3. ファイルがあればアップロードして上書き
+    let imageUrl = $('trade-img-preview').dataset.url || null;
+    if ($('trade-img-preview-container').classList.contains('hidden')) {
+        imageUrl = null;
+    }
 
     const file = $('trade-address-img').files[0];
     if (file) {
@@ -285,7 +311,7 @@ $('trade-form').onsubmit = async (e) => {
             imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl;
         } else {
             console.error("画像アップロードエラー:", uploadError);
-            alert("画像アップロードに失敗しました: " + uploadError.message + "\nストレージのポリシー(INSERT)を確認してください。");
+            alert("画像アップロードに失敗しました");
         }
     }
 
@@ -489,11 +515,33 @@ window.editTrade = (id) => {
 
     toggleModalCheckboxes(t.status);
     updateTradeItemSelects();
-    t.give_items.forEach((item, idx) => { if ($('give-items-list').children[idx]) { $('give-items-list').children[idx].querySelector('.item-id').value = item.id; $('give-items-list').children[idx].querySelector('.item-count').value = item.count; } });
-    t.receive_items.forEach((item, idx) => { if ($('receive-items-list').children[idx]) { $('receive-items-list').children[idx].querySelector('.item-id').value = item.id; $('receive-items-list').children[idx].querySelector('.item-count').value = item.count; } });
+    
+    // アイテムの流し込み
+    const giveList = $('give-items-list').children;
+    const receiveList = $('receive-items-list').children;
+    t.give_items.forEach((item, idx) => { 
+        if (giveList[idx]) { 
+            giveList[idx].querySelector('.item-id').value = item.id; 
+            giveList[idx].querySelector('.item-count').value = item.count; 
+        } 
+    });
+    t.receive_items.forEach((item, idx) => { 
+        if (receiveList[idx]) { 
+            receiveList[idx].querySelector('.item-id').value = item.id; 
+            receiveList[idx].querySelector('.item-count').value = item.count; 
+        } 
+    });
 
-    if (t.image_url) $('image-preview').innerHTML = `<img src="${t.image_url}">`;
-    else $('image-preview').innerHTML = '画像がありません';
+    // 画像の流し込み
+    if (t.image_url) {
+        $('trade-img-preview').src = t.image_url;
+        $('trade-img-preview').dataset.url = t.image_url;
+        show('trade-img-preview-container');
+    } else {
+        $('trade-img-preview').src = '';
+        $('trade-img-preview').dataset.url = '';
+        hide('trade-img-preview-container');
+    }
     show('trade-modal');
 };
 

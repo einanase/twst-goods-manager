@@ -410,16 +410,45 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 .mobile-only { display: none !important; }
 .desktop-only { display: block !important; }
 
-.t-content-layout { display: flex; justify-content: space-between; gap: 1.5rem; margin-top: 1rem; }
-.trade-text-info { flex: 1; min-width: 0; }
-.trade-visual-info { flex-shrink: 0; }
-
-.trade-info-extra {
-    margin: 1rem 0; padding: 1rem;
-    background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid var(--border-color);
+/* 取引モーダルの改善 */
+.multi-items-list { display: flex; flex-direction: column; gap: 0.2rem; }
+.item-row-compact {
+    display: flex; gap: 0.4rem; margin-bottom: 0.4rem; align-items: center;
+}
+.item-row-compact select {
+    flex: 1; min-width: 0; background: rgba(0,0,0,0.3); color: #fff;
+    border: 1px solid var(--border-color); padding: 6px; border-radius: 4px;
+}
+.item-row-compact .item-count {
+    width: 60px; flex-shrink: 0; background: rgba(0,0,0,0.3); color: #fff;
+    border: 1px solid var(--border-color); padding: 6px; border-radius: 4px; text-align: center;
 }
 
+.preview-container {
+    position: relative; display: inline-block; margin-top: 10px;
+}
+.modal-preview-img {
+    max-height: 150px; max-width: 100%; border-radius: 8px; border: 2px solid var(--accent-gold);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5); background: #000;
+}
+.remove-img-btn {
+    position: absolute; top: -10px; right: -10px; width: 28px; height: 28px;
+    background: #e74c3c; color: #fff; border: 2px solid #fff; border-radius: 50%;
+    cursor: pointer; font-size: 1.2rem; font-weight: bold;
+    display: flex; justify-content: center; align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4); transition: 0.2s;
+}
+.remove-img-btn:hover { background: #c0392b; transform: scale(1.1); }
+
+#trade-memo {
+    width: 100%; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid var(--border-color);
+    padding: 10px; border-radius: 6px; font-size: 0.9rem; resize: vertical;
+}
+
+.form-group.full-width { grid-column: span 2; }
+
 @media (max-width: 600px) {
+    .form-group.full-width { grid-column: span 1; }
     .mobile-only { display: block !important; }
     .desktop-only { display: none !important; }
 
