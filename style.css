@@ -87,6 +87,27 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 .header-actions { display: flex; gap: 0.5rem; align-items: center; }
 .search-input { width: 180px; padding: 0.4rem; font-size: 0.9rem; }
 
+/* 検索フィルター行 */
+.trade-filters {
+    display: flex;
+    gap: 0.8rem;
+    margin-bottom: 1.2rem;
+    flex-wrap: wrap;
+}
+.trade-filters select {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--accent-gold);
+    color: var(--accent-gold);
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.trade-filters select:hover {
+    background: rgba(212, 175, 55, 0.15);
+}
+
 /* ボタン */
 .primary-btn {
     background: linear-gradient(135deg, var(--accent-gold), #b8860b);

@@ -343,11 +343,20 @@ async function syncStock(oldT, newT) {
 
 function renderTrades() {
     const list = $('trades-list');
+    if (!list) return;
     const filter = $('status-filter').value;
+    const imgFilter = $('image-filter').value;
     const q = $('trade-search').value.toLowerCase();
     list.innerHTML = '';
+    
     tradesData
         .filter(t => filter === 'all' || t.status === filter)
+        .filter(t => {
+            if (imgFilter === 'all') return true;
+            if (imgFilter === 'あり') return !!t.image_url;
+            if (imgFilter === 'なし') return !t.image_url;
+            return true;
+        })
         .filter(t => (t.name || "").toLowerCase().includes(q))
         .forEach(t => {
             const card = document.createElement('div'); card.className = 'trade-card';

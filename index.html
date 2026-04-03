@@ -86,21 +86,25 @@
                     </div>
                 </section>
 
-                <!-- 取引管理画面 -->
                 <section id="trades-section" class="content-section hidden">
                     <header class="section-header">
                         <h2>取引一覧</h2>
                         <div class="header-actions">
-                            <input type="text" id="trade-search" class="search-input" placeholder="名前で検索...">
+                            <input type="text" id="trade-search" class="search-input" placeholder="名前で検索..." oninput="renderTrades()">
                             <button id="add-trade-btn" class="primary-btn">+ 取引追加</button>
                         </div>
                     </header>
                     <div class="trade-filters">
-                        <select id="status-filter">
+                        <select id="status-filter" onchange="renderTrades()">
                             <option value="all">すべてのステータス</option>
                             <option value="お声掛け中">お声掛け中</option>
                             <option value="仮約束">仮約束</option>
                             <option value="成約">成約</option>
+                        </select>
+                        <select id="image-filter" onchange="renderTrades()">
+                            <option value="all">すべての画像</option>
+                            <option value="あり">画像あり</option>
+                            <option value="なし">画像なし</option>
                         </select>
                     </div>
                     <div id="trades-list" class="trades-container">
