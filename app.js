@@ -390,7 +390,7 @@ function renderTrades() {
             const formatItem = i => {
                 const g = goodsData.find(gx => gx.id === i.id);
                 if (!g) return '?';
-                return `<span class="trade-item-line"><span class="t-item-content"><span class="t-type">${g.type}</span> / <span class="t-char">${g.char}</span></span><span class="t-count">×${i.count}</span></span>`;
+                return `<span class="trade-item-line"><span class="t-item-content"><span class="t-type">${g.type}</span> / <span class="t-char">${g.char}</span> <span class="t-count">×${i.count}</span></span></span>`;
             };
             const giveHtml = t.give_items.map(formatItem).join('');
             const receiveHtml = t.receive_items.map(formatItem).join('');
