@@ -172,7 +172,9 @@ function renderInventory() {
         card.className = 'goods-card single-line';
         card.innerHTML = `
             <div class="goods-info">
-                <span class="goods-name">${g.type} / ${g.char}</span>
+                <span class="goods-name">
+                    <span class="goods-type-label">${g.type}</span> / ${g.char}
+                </span>
             </div>
             <div class="goods-controls-wrap">
                 <div class="count-item">
