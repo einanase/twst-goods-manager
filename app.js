@@ -533,6 +533,7 @@ function renderTrades() {
     const filter = $('status-filter').value;
     const imgFilter = $('image-filter').value;
     const q = $('trade-search').value.toLowerCase();
+    const mq = $('memo-search').value.toLowerCase();
     list.innerHTML = '';
     
     tradesData
@@ -543,7 +544,11 @@ function renderTrades() {
             if (imgFilter === 'なし') return !t.image_url;
             return true;
         })
-        .filter(t => (t.name || "").toLowerCase().includes(q))
+        .filter(t => {
+            const nameMatch = (t.name || "").toLowerCase().includes(q);
+            const memoMatch = (t.memo || "").toLowerCase().includes(mq);
+            return nameMatch && memoMatch;
+        })
         .forEach(t => {
             const card = document.createElement('div'); card.className = 'trade-card';
             
