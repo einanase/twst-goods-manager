@@ -322,9 +322,21 @@ $('goods-form').onsubmit = async (e) => {
         planned_count: count,
         image_url: imageUrl
     };
-    if (id) await sb.from('goods').update(data).eq('id', id);
-    else await sb.from('goods').insert([data]);
-    hide('goods-modal'); fetchData();
+    let res;
+    if (id) res = await sb.from('goods').update(data).eq('id', id);
+    else res = await sb.from('goods').insert([data]);
+
+    if (res.error) {
+        console.error("データベース保存エラー:", res.error);
+        alert("データベースへの保存に失敗しました\nエラー詳細：" + res.error.message);
+        return;
+    }
+
+    console.log("保存された画像URL:", imageUrl);
+    hide('goods-modal'); 
+    
+    // DB反映ラグ対策として少し待ってから再取得
+    setTimeout(fetchData, 500);
 };
 
 window.editGoods = (id) => {
@@ -449,9 +461,21 @@ $('trade-form').onsubmit = async (e) => {
     // 在庫連動
     await syncStock(oldTrade, newTradeData);
 
-    if (id) await sb.from('trades').update(newTradeData).eq('id', id);
-    else await sb.from('trades').insert([newTradeData]);
-    hide('trade-modal'); fetchData();
+    let res;
+    if (id) res = await sb.from('trades').update(newTradeData).eq('id', id);
+    else res = await sb.from('trades').insert([newTradeData]);
+
+    if (res.error) {
+        console.error("データベース保存エラー:", res.error);
+        alert("データベースへの保存に失敗しました\nエラー詳細：" + res.error.message);
+        return;
+    }
+
+    console.log("保存された画像URL:", imageUrl);
+    hide('trade-modal'); 
+    
+    // DB反映ラグ対策として少し待ってから再取得
+    setTimeout(fetchData, 500);
 };
 
 async function syncStock(oldT, newT) {
