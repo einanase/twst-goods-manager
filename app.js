@@ -145,7 +145,7 @@ $('signup-btn').onclick = async () => {
 
 // --- データ取得 ---
 async function fetchData() {
-    const { data: g } = await sb.from('goods').select('*').order('created_at', { ascending: false });
+    const { data: g } = await sb.from('goods').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false });
     const { data: t } = await sb.from('trades').select('*').order('created_at', { ascending: false });
     goodsData = g || [];
     tradesData = t || [];
@@ -190,32 +190,33 @@ function renderInventory() {
         filteredGoods.forEach(g => {
             const card = document.createElement('div');
             card.className = 'goods-image-card';
+            card.dataset.id = g.id; // 並べ替え用
             card.innerHTML = `
                 <div class="gic-image-wrap" onclick="showOverlay('${g.image_url || ''}')">
                     ${g.image_url ? `<img src="${g.image_url}" class="gic-img">` : '<span class="gic-no-img">No Image</span>'}
                 </div>
                 <div class="gic-info">
-                    <span class="gic-name">
-                        <span class="goods-type-label">${g.type}</span> / ${g.char}
-                    </span>
+                    <div class="gic-name">
+                        <span class="goods-type-label">${g.type}</span><br>
+                        <span style="color: var(--accent-gold); font-size: 1rem;">${g.char}</span>
+                    </div>
                     <div class="gic-counts">
                         <div class="gic-count-row">
-                            <span class="gic-label">予定数</span>
-                            <span class="gic-num planned">${g.planned_count ?? g.count}</span>
-                        </div>
-                        <div class="gic-count-row">
-                            <span class="gic-label">実数</span>
-                            <div class="gic-controls">
-                                <button class="count-btn" onclick="updateCount('${g.id}', -1)">-</button>
-                                <span class="gic-num actual">${g.count}</span>
-                                <button class="count-btn" onclick="updateCount('${g.id}', 1)">+</button>
-                            </div>
+                            <span><span class="gic-label">予定数</span> <span class="gic-num planned">${g.planned_count ?? g.count}</span></span>
+                            <span>
+                                <span class="gic-label">実数</span>
+                                <span class="gic-controls">
+                                    <button class="count-btn" onclick="updateCount('${g.id}', -1); event.stopPropagation();">-</button>
+                                    <span class="gic-num actual">${g.count}</span>
+                                    <button class="count-btn" onclick="updateCount('${g.id}', 1); event.stopPropagation();">+</button>
+                                </span>
+                            </span>
                         </div>
                     </div>
                 </div>
                 <div class="gic-footer">
-                    <button class="nav-btn mini" onclick="editGoods('${g.id}')">編集</button>
-                    <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}')">削除</button>
+                    <button class="nav-btn mini" onclick="editGoods('${g.id}'); event.stopPropagation();">編集</button>
+                    <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}'); event.stopPropagation();">削除</button>
                 </div>
             `;
             list.appendChild(card);
@@ -225,11 +226,13 @@ function renderInventory() {
         filteredGoods.forEach(g => {
             const card = document.createElement('div');
             card.className = 'goods-card single-line';
+            card.dataset.id = g.id; // 並べ替え用
             card.innerHTML = `
                 <div class="goods-info">
-                    <span class="goods-name">
-                        <span class="goods-type-label">${g.type}</span> / ${g.char}
-                    </span>
+                    <div class="goods-name">
+                        <span class="goods-type-label">${g.type}</span><br>
+                        <span style="color: var(--accent-gold); font-size: 1rem;">${g.char}</span>
+                    </div>
                 </div>
                 <div class="goods-controls-wrap">
                     <div class="count-item">
@@ -238,19 +241,22 @@ function renderInventory() {
                     </div>
                     <div class="count-item actual-control">
                         <span class="count-label">実数</span>
-                        <button class="count-btn" onclick="updateCount('${g.id}', -1)">-</button>
+                        <button class="count-btn" onclick="updateCount('${g.id}', -1); event.stopPropagation();">-</button>
                         <span class="count-num">${g.count}</span>
-                        <button class="count-btn" onclick="updateCount('${g.id}', 1)">+</button>
+                        <button class="count-btn" onclick="updateCount('${g.id}', 1); event.stopPropagation();">+</button>
                     </div>
                     <div class="card-menu">
-                        <button class="nav-btn mini" onclick="editGoods('${g.id}')">編集</button>
-                        <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}')">削除</button>
+                        <button class="nav-btn mini" onclick="editGoods('${g.id}'); event.stopPropagation();">編集</button>
+                        <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}'); event.stopPropagation();">削除</button>
                     </div>
                 </div>
             `;
             list.appendChild(card);
         });
     }
+
+    // SortableJS の初期化
+    initializeSortable();
     // 一括リセットボタンはindex.html側に静的に配置しました。
 }
 
@@ -747,6 +753,35 @@ $('image-overlay').onclick = () => hide('image-overlay');
 $('goods-search').oninput = renderInventory;
 $('trade-search').oninput = renderTrades; // 追加
 $('status-filter').onchange = renderTrades;
+
+function initializeSortable() {
+    const list = $('goods-list');
+    if (window.inventorySortable) window.inventorySortable.destroy();
+    
+    // 検索中は並び替えを無効化
+    if ($('goods-search').value) return;
+
+    window.inventorySortable = new Sortable(list, {
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        delay: 500, // スマホでの長押し対応（500ms）
+        delayOnTouchOnly: true,
+        filter: '.nav-btn, .count-btn', // ボタン操作時はドラッグを無効化
+        onEnd: async () => {
+            const ids = Array.from(list.children).map(el => el.dataset.id);
+            // 順番を一斉更新
+            for (let i = 0; i < ids.length; i++) {
+                await sb.from('goods').update({ sort_order: i }).eq('id', ids[i]);
+            }
+            // ローカルのデータも一応更新
+            ids.forEach((id, i) => {
+                const g = goodsData.find(x => x.id === id);
+                if (g) g.sort_order = i;
+            });
+        }
+    });
+}
 
 async function checkAndMigrateLocalData() {
     const local = JSON.parse(localStorage.getItem('twst_goods') || '[]');
