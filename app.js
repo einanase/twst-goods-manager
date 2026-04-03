@@ -48,7 +48,7 @@ window.handlePasswordUpdate = async (e) => {
 };
 
 window.handleLogout = async () => {
-    alert('ログアウトを実行します…');
+    if (!confirm('ログアウトしてもよろしいですか？')) return;
     try {
         // 1. UIを即座に戻す
         handleAuthStateChange(null);
