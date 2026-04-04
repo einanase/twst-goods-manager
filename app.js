@@ -9,6 +9,24 @@ let tradesData = [];
 let isRecovering = false;
 let currentInventoryView = localStorage.getItem('twst_inventory_view') || 'list';
 
+// アプリバージョン
+const APP_VERSION = '1.2 (Defensive Sync Fix)';
+console.log(`%ctwst-goods-manager ${APP_VERSION}`, 'color: #d4af37; font-weight: bold; font-size: 1.2rem;');
+
+// グローバルエラーハンドリング（どこかで失敗したら即通知）
+window.addEventListener('unhandledrejection', event => {
+    const errorMsg = event.reason?.message || event.reason;
+    console.error('Unhandled rejection:', event.reason);
+    alert('通信エラーまたはプログラムエラーが発生しました。ページを読み込み直してください。\n理由：' + errorMsg);
+});
+
+// 通常のエラーもキャッチ
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+    console.error('Window Error:', msg, error);
+    alert('エラーが発生しました：' + msg);
+    return false;
+};
+
 const $ = (id) => document.getElementById(id);
 const show = (id) => $(id)?.classList.remove('hidden');
 const hide = (id) => $(id)?.classList.add('hidden');
@@ -145,10 +163,19 @@ $('signup-btn').onclick = async () => {
 
 // --- データ取得 ---
 async function fetchData() {
-    const { data: g } = await sb.from('goods').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false });
-    const { data: t } = await sb.from('trades').select('*').order('created_at', { ascending: false });
+    console.log("Fetching latest data from Supabase...");
+    const { data: g, error: ge } = await sb.from('goods').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false });
+    const { data: t, error: te } = await sb.from('trades').select('*').order('created_at', { ascending: false });
+    
+    if (ge || te) {
+        console.error("Fetch error:", ge || te);
+        throw new Error("データの取得に失敗しました");
+    }
+
     goodsData = g || [];
     tradesData = t || [];
+    console.log(`Data loaded: ${goodsData.length} items, ${tradesData.length} trades.`);
+    
     renderInventory();
     renderTrades();
     updateTradeItemSelects();
@@ -171,11 +198,15 @@ window.setInventoryView = (view) => {
 };
 
 async function resetPlannedCounts() {
-    if (!confirm('全ての「予定数」を「実数」と同じ値にリセットしますか？（消した取引が反映されない場合に有効です）')) return;
+    if (!confirm('全ての「予定数」を「実数 ＋ 未完了の成約取引」で一括再計算しますか？')) return;
+    console.log("--- Resetting Planned Counts ---");
+    // 全て最新にするために一度 fetchData
+    await fetchData();
     for (const g of goodsData) {
-        await sb.from('goods').update({ planned_count: g.count }).eq('id', g.id);
+        await recalculatePlannedCount(g.id);
     }
-    fetchData();
+    console.log("--- Reset Completed ---");
+    fetchData(); // 最終表示
 }
 
 function renderInventory() {
@@ -264,11 +295,16 @@ function renderInventory() {
 }
 
 async function updateCount(id, delta) {
-    const g = goodsData.find(x => x.id === id);
+    const g = goodsData.find(x => String(x.id) === String(id));
     if (!g) return;
     const newCount = Math.max(0, g.count + delta);
-    const newPlanned = Math.max(0, (g.planned_count ?? g.count) + delta);
-    await sb.from('goods').update({ count: newCount, planned_count: newPlanned }).eq('id', id);
+    await sb.from('goods').update({ count: newCount }).eq('id', id);
+    
+    // ローカルも更新しておくと再計算が正確になる
+    g.count = newCount;
+    
+    // 予定数を再計算
+    await recalculatePlannedCount(id);
     fetchData();
 }
 
@@ -331,14 +367,19 @@ $('goods-form').onsubmit = async (e) => {
         planned_count: count,
         image_url: imageUrl
     };
-    let res;
-    if (id) res = await sb.from('goods').update(data).eq('id', id);
-    else res = await sb.from('goods').insert([data]);
+    const res = id 
+        ? await sb.from('goods').update(data).eq('id', id)
+        : await sb.from('goods').insert([data]);
 
     if (res.error) {
         console.error("データベース保存エラー:", res.error);
         alert("データベースへの保存に失敗しました\nエラー詳細：" + res.error.message);
         return;
+    }
+
+    // 編集時は予定数がズレている可能性があるので再計算する（ insert 時は data に planned_count: count を入れているのでOK ）
+    if (id) {
+        await recalculatePlannedCount(id);
     }
 
     console.log("保存された画像URL:", imageUrl);
@@ -435,8 +476,17 @@ $('trade-status').onchange = (e) => toggleModalCheckboxes(e.target.value);
 $('trade-form').onsubmit = async (e) => {
     e.preventDefault();
     const id = $('trade-id').value;
-    const giveItems = Array.from($('give-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').textContent) })).filter(i => i.id && i.count > 0);
-    const receiveItems = Array.from($('receive-items-list').children).map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').textContent) })).filter(i => i.id && i.count > 0);
+    const giveItems = Array.from($('give-items-list').children)
+        .map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').textContent) }))
+        .filter(i => i.id && i.count > 0);
+    const receiveItems = Array.from($('receive-items-list').children)
+        .map(r => ({ id: r.querySelector('.item-id').value, count: parseInt(r.querySelector('.item-count').textContent) }))
+        .filter(i => i.id && i.count > 0);
+
+    if (giveItems.length === 0 && receiveItems.length === 0) {
+        alert("アイテムを1つ以上選択し、個数を1以上に設定してください。");
+        return;
+    }
     
     const oldTrade = id ? tradesData.find(t => t.id === id) : null;
     
@@ -477,54 +527,141 @@ $('trade-form').onsubmit = async (e) => {
         est_ship_date: $('trade-est-ship-date').value, est_receive_date: $('trade-est-receive-date').value
     };
 
-    // 在庫連動
-    await syncStock(oldTrade, newTradeData);
+    // 在庫連動は保存・取得後に実行するためここでは行わない
 
-    let res;
-    if (id) res = await sb.from('trades').update(newTradeData).eq('id', id);
-    else res = await sb.from('trades').insert([newTradeData]);
+    console.log("Saving trade data (Ensuring ID with select)...");
+    const { data: savedData, error: dbError } = await (id 
+        ? sb.from('trades').update(newTradeData).eq('id', id).select()
+        : sb.from('trades').insert([newTradeData]).select());
 
-    if (res.error) {
-        console.error("データベース保存エラー:", res.error);
-        alert("データベースへの保存に失敗しました\nエラー詳細：" + res.error.message);
+    if (dbError || !savedData?.[0]) {
+        console.error("データベース保存エラー:", dbError);
+        alert("データベースへの保存に失敗しました\nエラー詳細：" + (dbError?.message || "データが返ってきませんでした"));
         return;
     }
 
-    console.log("保存された画像URL:", imageUrl);
+    const savedTrade = savedData[0];
+    console.log("Trade saved! ID:", savedTrade.id);
+
+    // 1. ローカルの tradesData を更新
+    const tidx = tradesData.findIndex(x => x.id == savedTrade.id);
+    if (tidx > -1) tradesData[tidx] = savedTrade; else tradesData.unshift(savedTrade);
+
+    // 2. 在庫の同期実行（実数デルタ ＋ 予定数再計算）
+    await syncStock(oldTrade, savedTrade);
+
     hide('trade-modal'); 
-    
-    // DB反映ラグ対策として少し待ってから再取得
-    setTimeout(fetchData, 500);
+    fetchData(); // 表示の最終同期
 };
 
-async function syncStock(oldT, newT) {
-    const solve = async (items, type, delta) => {
-        for (const it of items) {
-            const g = goodsData.find(x => x.id === it.id);
-            if (!g) continue;
-            const updateObj = {};
-            if (type === 'planned') updateObj.planned_count = (g.planned_count ?? g.count) + (delta * it.count);
-            else updateObj.count = g.count + (delta * it.count);
-            await sb.from('goods').update(updateObj).eq('id', g.id);
-            if (type === 'planned') g.planned_count = updateObj.planned_count; else g.count = updateObj.count;
-        }
-    };
-
-    const oldContracted = oldT?.status === '成約';
-    const newContracted = newT?.status === '成約';
-    if (!oldContracted && newContracted) {
-        await solve(newT.give_items, 'planned', -1); await solve(newT.receive_items, 'planned', 1);
-    } else if (oldContracted && !newContracted) {
-        await solve(oldT.give_items, 'planned', 1); await solve(oldT.receive_items, 'planned', -1);
-    } else if (oldContracted && newContracted) {
-        await solve(oldT.give_items, 'planned', 1); await solve(oldT.receive_items, 'planned', -1);
-        await solve(newT.give_items, 'planned', -1); await solve(newT.receive_items, 'planned', 1);
+/**
+ * 特定のアイテムの「予定数」を現在の「実数」と「全ての取引データ」から厳密に再計算して更新する
+ */
+async function recalculatePlannedCount(itemId) {
+    const sid = String(itemId);
+    // 最新の実数をDBから取得
+    const { data: g, error: gError } = await sb.from('goods').select('count').eq('id', sid).single();
+    if (gError || !g) {
+        console.warn(`Item ${sid} not found for recalculation. Error:`, gError);
+        return;
     }
 
-    if (!oldT?.is_sent && newT.is_sent) await solve(newT.give_items, 'actual', -1);
-    else if (oldT?.is_sent && !newT.is_sent) await solve(oldT.give_items, 'actual', 1);
-    if (!oldT?.is_received && newT.is_received) await solve(newT.receive_items, 'actual', 1);
-    else if (oldT?.is_received && !newT.is_received) await solve(oldT.receive_items, 'actual', -1);
+    // 予定数 = 実数 + (成約済みかつ未受取の数) - (成約済みかつ未発送の数)
+    let pendingDiff = 0;
+    tradesData.forEach(t => {
+        if (t.status !== '成約') return;
+        
+        // 渡すもの (String強制変換で確実に比較)
+        const give = (t.give_items || []).find(i => String(i.id) === sid);
+        if (give && !t.is_sent) {
+            console.log(`[Calculate] item:${sid}, type:GIVE(-${give.count}), trade:${t.name}`);
+            pendingDiff -= give.count;
+        }
+        
+        // 受けるもの
+        const receive = (t.receive_items || []).find(i => String(i.id) === sid);
+        if (receive && !t.is_received) {
+            console.log(`[Calculate] item:${sid}, type:RECEIVE(+${receive.count}), trade:${t.name}`);
+            pendingDiff += receive.count;
+        }
+    });
+
+    const newPlanned = Math.max(0, g.count + pendingDiff);
+    console.log(`[Result] Item:${sid} -> Actual:${g.count} + PendingDiff:${pendingDiff} = Planned:${newPlanned}`);
+    
+    // DB更新
+    await sb.from('goods').update({ planned_count: newPlanned }).eq('id', sid);
+    
+    // ローカル変数の即時反映 (fetchを待たずにUI更新)
+    const localGood = goodsData.find(x => String(x.id) === sid);
+    if (localGood) {
+        localGood.count = g.count;
+        localGood.planned_count = newPlanned;
+    }
+    renderInventory(); // 即座に再読み込み
+}
+
+async function syncStock(oldT, newT) {
+    const affectedItemIds = new Set();
+    
+    // 1. 実数 (count) の同期
+    const updateActual = async (itemId, delta) => {
+        const sid = String(itemId);
+        // 型不一致を防ぐための String(id) 比較
+        const g = goodsData.find(x => String(x.id) === sid);
+        if (!g) {
+            console.warn(`UpdateActual failed: item ${sid} not found in local goodsData.`);
+            return;
+        }
+        
+        const newCount = Math.max(0, g.count + delta);
+        console.log(`[UpdateActual] Item:${sid} count: ${g.count} -> ${newCount}`);
+        
+        const { error } = await sb.from('goods').update({ count: newCount }).eq('id', sid);
+        if (error) {
+            console.error(`UpdateActual error for item ${sid}:`, error);
+            throw new Error(`実数の更新に失敗しました: ${error.message}`);
+        }
+        g.count = newCount; // 再計算のためにローカルも更新
+        affectedItemIds.add(sid);
+    };
+
+    // 発送済フラグの変化
+    if (!oldT?.is_sent && newT.is_sent) {
+        for (const it of (newT.give_items || [])) await updateActual(it.id, -it.count);
+    } else if (oldT?.is_sent && !newT.is_sent) {
+        for (const it of (oldT.give_items || [])) await updateActual(it.id, it.count);
+    } else if (oldT?.is_sent && newT.is_sent) {
+        // アイテム内容変更時の補正
+        for (const it of (oldT.give_items || [])) await updateActual(it.id, it.count);
+        for (const it of (newT.give_items || [])) await updateActual(it.id, -it.count);
+    }
+
+    // 受取済フラグの変化
+    if (!oldT?.is_received && newT.is_received) {
+        for (const it of (newT.receive_items || [])) await updateActual(it.id, it.count);
+    } else if (oldT?.is_received && !newT.is_received) {
+        for (const it of (oldT.receive_items || [])) await updateActual(it.id, -it.count);
+    } else if (oldT?.is_received && newT.is_received) {
+        // アイテム内容変更時の補正
+        for (const it of (oldT.receive_items || [])) await updateActual(it.id, -it.count);
+        for (const it of (newT.receive_items || [])) await updateActual(it.id, it.count);
+    }
+
+    // 2. 予定数 (planned_count) の同期
+    if (oldT) {
+        (oldT.give_items || []).forEach(i => { if(i.id) affectedItemIds.add(String(i.id)); });
+        (oldT.receive_items || []).forEach(i => { if(i.id) affectedItemIds.add(String(i.id)); });
+    }
+    if (newT) {
+        (newT.give_items || []).forEach(i => { if(i.id) affectedItemIds.add(String(i.id)); });
+        (newT.receive_items || []).forEach(i => { if(i.id) affectedItemIds.add(String(i.id)); });
+    }
+
+    console.log(`Syncing stock for items: ${Array.from(affectedItemIds).join(', ')}`);
+    for (const itemId of affectedItemIds) {
+        await recalculatePlannedCount(itemId);
+    }
 }
 
 function renderTrades() {
@@ -553,12 +690,16 @@ function renderTrades() {
             const card = document.createElement('div'); card.className = 'trade-card';
             
             const formatItem = i => {
-                const g = goodsData.find(gx => gx.id === i.id);
-                if (!g) return '?';
+                const sid = String(i.id);
+                const g = goodsData.find(gx => String(gx.id) === sid);
+                if (!g) {
+                    console.warn(`Trade item ID ${sid} not found in goodsData.`);
+                    return `<span class="trade-item-line">? (ID:${sid}) ×${i.count}</span>`;
+                }
                 return `<span class="trade-item-line"><span class="t-item-content"><span class="t-type">${g.type}</span> / <span class="t-char">${g.char}</span> <span class="t-count">×${i.count}</span></span></span>`;
             };
-            const giveHtml = t.give_items.map(formatItem).join('');
-            const receiveHtml = t.receive_items.map(formatItem).join('');
+            const giveHtml = (t.give_items || []).map(formatItem).join('');
+            const receiveHtml = (t.receive_items || []).map(formatItem).join('');
             
             const isTradeContracted = t.status === '成約';
 
@@ -645,21 +786,48 @@ function renderTrades() {
 }
 
 window.quickStatusChange = async (id, newS) => {
-    const t = tradesData.find(x => x.id === id);
+    const t = tradesData.find(x => String(x.id) === String(id));
     if (!t) return;
     const newT = JSON.parse(JSON.stringify(t)); newT.status = newS;
     if (newS !== '成約') { newT.is_sent = false; newT.is_received = false; }
-    await syncStock(t, newT);
-    await sb.from('trades').update({ status: newS, is_sent: newT.is_sent, is_received: newT.is_received }).eq('id', id);
+    
+    // DB更新を先行し、結果を確実に受け取る (select()を使用)
+    const { data: saved, error } = await sb.from('trades').update({ 
+        status: newS, is_sent: newT.is_sent, is_received: newT.is_received 
+    }).eq('id', id).select();
+    
+    if (error || !saved?.[0]) {
+        console.error("Quick status update error:", error);
+        return;
+    }
+
+    // ローカル更新
+    const idx = tradesData.findIndex(x => String(x.id) === String(id));
+    if (idx > -1) tradesData[idx] = saved[0];
+
+    // 同期実行
+    await syncStock(t, saved[0]);
     fetchData();
 };
 
 window.quickCheck = async (id, field, value) => {
-    const t = tradesData.find(x => x.id === id);
+    const t = tradesData.find(x => String(x.id) === String(id));
     if (!t || t.status !== '成約') return;
     const newT = JSON.parse(JSON.stringify(t)); newT[field] = value;
-    await syncStock(t, newT);
-    await sb.from('trades').update({ [field]: value }).eq('id', id);
+
+    // DB更新を先行し、結果を確実に受け取る
+    const { data: saved, error } = await sb.from('trades').update({ [field]: value }).eq('id', id).select();
+    
+    if (error || !saved?.[0]) {
+        console.error("Quick check update error:", error);
+        return;
+    }
+
+    // ローカル更新
+    const idx = tradesData.findIndex(x => String(x.id) === String(id));
+    if (idx > -1) tradesData[idx] = saved[0];
+
+    await syncStock(t, saved[0]);
     fetchData();
 };
 
@@ -670,7 +838,7 @@ window.quickDateChange = async (id, field, value) => {
 };
 
 window.editTrade = (id) => {
-    const t = tradesData.find(x => x.id === id);
+    const t = tradesData.find(x => String(x.id) === String(id));
     if (!t) return;
     $('trade-id').value = t.id; $('trade-name').value = t.name; $('trade-type').value = t.type; $('trade-status').value = t.status;
     $('trade-give-price').value = t.give_price; $('trade-receive-price').value = t.receive_price;
@@ -684,13 +852,13 @@ window.editTrade = (id) => {
     // アイテムの流し込み
     const giveList = $('give-items-list').children;
     const receiveList = $('receive-items-list').children;
-    t.give_items.forEach((item, idx) => { 
+    (t.give_items || []).forEach((item, idx) => { 
         if (giveList[idx]) { 
             giveList[idx].querySelector('.item-id').value = item.id; 
             giveList[idx].querySelector('.item-count').textContent = item.count; 
         } 
     });
-    t.receive_items.forEach((item, idx) => { 
+    (t.receive_items || []).forEach((item, idx) => { 
         if (receiveList[idx]) { 
             receiveList[idx].querySelector('.item-id').value = item.id; 
             receiveList[idx].querySelector('.item-count').textContent = item.count; 
@@ -711,19 +879,19 @@ window.editTrade = (id) => {
 };
 
 window.deleteTrade = async (id) => {
-    if (confirm('削除しますか？')) {
-        const t = tradesData.find(x => x.id === id);
-        if (t) {
-            // 削除前に、在庫変動をすべて逆再生する
-            const undoT = JSON.parse(JSON.stringify(t));
-            undoT.status = 'キャンセル';
-            undoT.is_sent = false;
-            undoT.is_received = false;
-            await syncStock(t, undoT);
-        }
-        await sb.from('trades').delete().eq('id', id);
-        fetchData();
+    if (!confirm('取引を削除しますか？在庫への影響も取り消されます。')) return;
+    const t = tradesData.find(x => String(x.id) === String(id));
+    if (t) {
+        // 削除前に、在庫変動をすべて逆再生する
+        console.log("Undoing trade stock impacts before deletion...");
+        const undoT = JSON.parse(JSON.stringify(t));
+        undoT.status = 'キャンセル';
+        undoT.is_sent = false;
+        undoT.is_received = false;
+        await syncStock(t, undoT);
     }
+    await sb.from('trades').delete().eq('id', id);
+    fetchData();
 };
 
 // --- その他UI & ページ維持 ---
