@@ -935,6 +935,16 @@ document.querySelectorAll('.cancel-btn').forEach(b => {
         removeGoodsImage(); // ここで画像プレビューをリセットしておく
     };
 });
+
+// モーダル背景クリックで閉じる
+['goods-modal', 'trade-modal'].forEach(id => {
+    $(id).onclick = (e) => {
+        if (e.target === e.currentTarget) {
+            hide(id);
+            if (id === 'goods-modal') removeGoodsImage();
+        }
+    };
+});
 window.showOverlay = (url) => { $('overlay-img').src = url; show('image-overlay'); };
 $('image-overlay').onclick = () => hide('image-overlay');
 $('goods-search').oninput = renderInventory;
