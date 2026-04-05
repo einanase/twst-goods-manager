@@ -223,6 +223,7 @@ function renderInventory() {
             card.className = 'goods-image-card';
             card.dataset.id = g.id; // 並べ替え用
             card.innerHTML = `
+                <div class="drag-handle" title="ドラッグして並び替え"></div>
                 <div class="gic-image-wrap" onclick="showOverlay('${g.image_url || ''}')">
                     ${g.image_url ? `<img src="${g.image_url}" class="gic-img">` : '<span class="gic-no-img">No Image</span>'}
                 </div>
@@ -262,6 +263,7 @@ function renderInventory() {
             card.className = 'goods-card single-line';
             card.dataset.id = g.id; // 並べ替え用
             card.innerHTML = `
+                <div class="drag-handle" title="ドラッグして並び替え"></div>
                 <div class="goods-info">
                     <div class="goods-name">
                         <span class="goods-type-label">${g.type}</span><br>
@@ -962,9 +964,7 @@ function initializeSortable() {
         animation: 150,
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
-        delay: 500, // スマホでの長押し対応（500ms）
-        delayOnTouchOnly: true,
-        filter: '.nav-btn, .count-btn', // ボタン操作時はドラッグを無効化
+        handle: '.drag-handle', // ハンドルのみドラッグ可能にする
         onEnd: async () => {
             const ids = Array.from(list.children).map(el => el.dataset.id);
             // 順番を一斉更新

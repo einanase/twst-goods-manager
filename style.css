@@ -718,6 +718,55 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     box-shadow: 0 0 20px rgba(212, 175, 55, 0.5) !important;
 }
 
+/* ドラッグハンドル */
+.drag-handle {
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--secondary-text);
+    opacity: 0.6;
+    transition: 0.2s;
+    user-select: none;
+    -webkit-user-drag: none;
+    touch-action: none; /* スマホでのドラッグ安定化 */
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle:hover { opacity: 1; color: var(--accent-gold); }
+
+/* 六点リーダーのようなアイコン */
+.drag-handle::before {
+    content: "⠿";
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+/* リスト形式での配置 */
+.goods-card.single-line .drag-handle {
+    padding-right: 8px;
+    border-right: 1px solid rgba(212, 175, 55, 0.2);
+    margin-right: 4px;
+}
+
+/* ギャラリー形式での配置（画像の上に浮かす） */
+.goods-image-card .drag-handle {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+@media (max-width: 600px) {
+    .goods-image-card .drag-handle {
+        width: 36px; height: 36px; /* スマホでは少し大きめに */
+    }
+}
+
 /* 画像形式の情報行（縦並びの2カラム） */
 .gic-counts {
     margin-top: 0.5rem;
