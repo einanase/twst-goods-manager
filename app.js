@@ -459,10 +459,11 @@ $('trade-address-img').onchange = (e) => {
 
 $('add-trade-btn').onclick = () => {
     $('trade-form').reset(); $('trade-id').value = ''; 
+    $('trade-status').value = '成約'; 
     $('trade-img-preview').src = ''; $('trade-img-preview').dataset.url = '';
     hide('trade-img-preview-container');
     updateTradeItemSelects(); 
-    toggleModalCheckboxes('お声掛け中');
+    toggleModalCheckboxes('成約');
     show('trade-modal');
 };
 
@@ -718,7 +719,7 @@ function renderTrades() {
                     </div>
                     <div class="tg-status">
                         <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
-                            ${['お声掛け中','仮約束','成約'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
+                            ${['成約','仮約束','お声掛け中'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
                         </select>
                     </div>
                     ${t.image_url ? `
