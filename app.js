@@ -250,6 +250,7 @@ function renderInventory() {
                     </div>
                 </div>
                 <div class="gic-footer">
+                    <button class="nav-btn mini trade-check-btn" onclick="showGoodsDetail('${g.id}'); event.stopPropagation();">取引確認</button>
                     <button class="nav-btn mini" onclick="editGoods('${g.id}'); event.stopPropagation();">編集</button>
                     <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}'); event.stopPropagation();">削除</button>
                 </div>
@@ -282,6 +283,7 @@ function renderInventory() {
                         <button class="count-btn" onclick="updateCount('${g.id}', 1); event.stopPropagation();">+</button>
                     </div>
                     <div class="card-menu">
+                        <button class="nav-btn mini trade-check-btn" onclick="showGoodsDetail('${g.id}'); event.stopPropagation();">取引確認</button>
                         <button class="nav-btn mini" onclick="editGoods('${g.id}'); event.stopPropagation();">編集</button>
                         <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}'); event.stopPropagation();">削除</button>
                     </div>
@@ -897,6 +899,63 @@ window.deleteTrade = async (id) => {
     fetchData();
 };
 
+// --- グッズ詳細モーダル ---
+window.showGoodsDetail = (goodsId) => {
+    const sid = String(goodsId);
+    const g = goodsData.find(x => String(x.id) === sid);
+    if (!g) return;
+
+    // タイトル設定
+    $('gd-title').textContent = `【${g.type}】${g.char} の取引一覧`;
+
+    // 対象の取引を抽出
+    const pendingRows = []; // ① 未発送
+    const shippedRows = []; // ② 発送済
+
+    tradesData.forEach(t => {
+        // give_items に含まれているか
+        const giveItem = (t.give_items || []).find(i => String(i.id) === sid);
+        // receive_items に含まれているか
+        const receiveItem = (t.receive_items || []).find(i => String(i.id) === sid);
+
+        if (!giveItem && !receiveItem) return; // このグッズに無関係
+
+        const buildRow = (item, direction) => {
+            const dirLabel = direction === 'give' ? '渡す' : '受ける';
+            const dirClass = direction === 'give' ? 'give' : 'receive';
+            return `
+                <div class="gd-trade-row">
+                    <span class="gd-trade-name">${t.name || '（名前なし）'}</span>
+                    <span class="gd-trade-count">×${item.count}</span>
+                    <span class="gd-badge ${dirClass}">${dirLabel}</span>
+                    <span class="gd-status-chip">${t.status}</span>
+                </div>`;
+        };
+
+        if (t.is_sent) {
+            // ② 発送済み
+            if (giveItem) shippedRows.push(buildRow(giveItem, 'give'));
+            if (receiveItem) shippedRows.push(buildRow(receiveItem, 'receive'));
+        } else {
+            // ① 未発送（ステータス問わず）
+            if (giveItem) pendingRows.push(buildRow(giveItem, 'give'));
+            if (receiveItem) pendingRows.push(buildRow(receiveItem, 'receive'));
+        }
+    });
+
+    $('gd-pending-list').innerHTML = pendingRows.length
+        ? pendingRows.join('')
+        : '<div class="gd-empty">（なし）</div>';
+
+    $('gd-shipped-list').innerHTML = shippedRows.length
+        ? shippedRows.join('')
+        : '<div class="gd-empty">（なし）</div>';
+
+    show('goods-detail-modal');
+};
+
+window.closeGoodsDetail = () => hide('goods-detail-modal');
+
 // --- その他UI & ページ維持 ---
 function switchSection(section) {
     if (section === 'inventory') {
@@ -940,7 +999,7 @@ document.querySelectorAll('.cancel-btn').forEach(b => {
 });
 
 // モーダル背景クリックで閉じる
-['goods-modal', 'trade-modal'].forEach(id => {
+['goods-modal', 'trade-modal', 'goods-detail-modal'].forEach(id => {
     $(id).onclick = (e) => {
         if (e.target === e.currentTarget) {
             hide(id);

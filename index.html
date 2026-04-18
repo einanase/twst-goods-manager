@@ -259,6 +259,31 @@
             </div>
         </div>
 
+        <!-- グッズ詳細モーダル（取引一覧） -->
+        <div id="goods-detail-modal" class="modal hidden">
+            <div class="glass-panel">
+                <div id="gd-title" class="gd-title"></div>
+
+                <!-- ① 未発送の成立取引 -->
+                <div class="gd-section">
+                    <div class="gd-section-header pending">
+                        📦 発送前の取引（成立・仮約束・お声掛け中）
+                    </div>
+                    <div id="gd-pending-list"></div>
+                </div>
+
+                <!-- ② 発送済 -->
+                <div class="gd-section">
+                    <div class="gd-section-header shipped">
+                        ✅ 発送済み
+                    </div>
+                    <div id="gd-shipped-list"></div>
+                </div>
+
+                <button class="gd-close-btn" onclick="closeGoodsDetail()">閉じる</button>
+            </div>
+        </div>
+
         <!-- 画像拡大用オーバーレイ -->
         <div id="image-overlay" class="image-overlay hidden">
             <span class="close-overlay">&times;</span>
