@@ -678,6 +678,12 @@ function renderTrades() {
     const mq = $('memo-search').value.toLowerCase();
     list.innerHTML = '';
     
+    // 登録順の番号マップを作成（古い順に1番から）
+    const tradeNumberMap = new Map();
+    tradesData.forEach((t, idx) => {
+        tradeNumberMap.set(t.id, tradesData.length - idx);
+    });
+
     tradesData
         .filter(t => filter === 'all' || t.status === filter)
         .filter(t => {
@@ -692,6 +698,7 @@ function renderTrades() {
             return nameMatch && memoMatch;
         })
         .forEach(t => {
+            const tradeNo = tradeNumberMap.get(t.id);
             const card = document.createElement('div'); card.className = 'trade-card';
             
             const formatItem = i => {
@@ -711,6 +718,7 @@ function renderTrades() {
             card.innerHTML = `
                 <div class="trade-card-grid">
                     <div class="tg-name">
+                        <span class="trade-number-badge">#${tradeNo}</span>
                         <span class="trade-user">${t.name}</span>
                     </div>
                     <div class="tg-actions">
