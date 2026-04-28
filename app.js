@@ -916,6 +916,12 @@ window.showGoodsDetail = (goodsId) => {
     // タイトル設定
     $('gd-title').textContent = `【${g.type}】${g.char} の取引一覧`;
 
+    // 登録順の番号マップを作成（古い順に1番から）
+    const tradeNumberMap = new Map();
+    tradesData.forEach((tx, idx) => {
+        tradeNumberMap.set(tx.id, tradesData.length - idx);
+    });
+
     // 対象の取引を抽出
     const pendingRows = []; // ① 未発送
     const shippedRows = []; // ② 発送済
@@ -928,11 +934,13 @@ window.showGoodsDetail = (goodsId) => {
 
         if (!giveItem && !receiveItem) return; // このグッズに無関係
 
+        const tradeNo = tradeNumberMap.get(t.id);
         const buildRow = (item, direction) => {
             const dirLabel = direction === 'give' ? '渡す' : '受ける';
             const dirClass = direction === 'give' ? 'give' : 'receive';
             return `
                 <div class="gd-trade-row">
+                    <span class="trade-number-badge">#${tradeNo}</span>
                     <span class="gd-trade-name">${t.name || '（名前なし）'}</span>
                     <span class="gd-trade-count">×${item.count}</span>
                     <span class="gd-badge ${dirClass}">${dirLabel}</span>
