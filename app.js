@@ -472,6 +472,7 @@ $('add-trade-btn').onclick = () => {
 // モーダル内のチェックボックスの活性・非活性を切り替える
 function toggleModalCheckboxes(status) {
     const isDisabled = status !== '成約';
+    $('trade-is-packed').disabled = isDisabled;
     $('trade-is-sent').disabled = isDisabled;
     $('trade-is-received').disabled = isDisabled;
 }
@@ -527,6 +528,7 @@ $('trade-form').onsubmit = async (e) => {
         give_price: parseInt($('trade-give-price').value), receive_price: parseInt($('trade-receive-price').value),
         image_url: imageUrl,
         // 成約していない場合は強制的にfalseにする（安全のため）
+        is_packed: isActuallyContracted ? $('trade-is-packed').checked : false,
         is_sent: isActuallyContracted ? $('trade-is-sent').checked : false, 
         is_received: isActuallyContracted ? $('trade-is-received').checked : false,
         est_ship_date: $('trade-est-ship-date').value, est_receive_date: $('trade-est-receive-date').value
@@ -684,7 +686,7 @@ function renderTrades() {
         tradeNumberMap.set(t.id, tradesData.length - idx);
     });
 
-    tradesData
+    let filteredTrades = tradesData
         .filter(t => filter === 'all' || t.status === filter)
         .filter(t => {
             if (imgFilter === 'all') return true;
@@ -696,8 +698,29 @@ function renderTrades() {
             const nameMatch = (t.name || "").toLowerCase().includes(q);
             const memoMatch = (t.memo || "").toLowerCase().includes(mq);
             return nameMatch && memoMatch;
-        })
-        .forEach(t => {
+        });
+
+    const sortFilter = $('sort-filter') ? $('sort-filter').value : 'number-desc';
+
+    filteredTrades.sort((a, b) => {
+        const noA = tradeNumberMap.get(a.id);
+        const noB = tradeNumberMap.get(b.id);
+        
+        if (sortFilter === 'number-asc') {
+            return noA - noB;
+        } else if (sortFilter === 'unshipped-first') {
+            const aShipped = a.is_sent ? 1 : 0;
+            const bShipped = b.is_sent ? 1 : 0;
+            if (aShipped !== bShipped) {
+                return aShipped - bShipped;
+            }
+            return noB - noA;
+        } else {
+            return noB - noA;
+        }
+    });
+
+    filteredTrades.forEach(t => {
             const tradeNo = tradeNumberMap.get(t.id);
             const card = document.createElement('div'); card.className = 'trade-card';
             
@@ -752,6 +775,11 @@ function renderTrades() {
                         <div class="trade-info-extra desktop-only">
                             <div class="trade-dates-desktop">
                                 <div class="date-check-pair">
+                                    <label class="tag-inline ${t.is_packed?'done':''} ${!isTradeContracted?'disabled':''}">
+                                        <input type="checkbox" ${t.is_packed?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_packed', this.checked)"> 梱包済
+                                    </label>
+                                </div>
+                                <div class="date-check-pair">
                                     <span class="d-label">発送予定:</span>
                                     <input type="date" value="${t.est_ship_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_ship_date', this.value)">
                                     <label class="tag-inline ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
@@ -770,6 +798,11 @@ function renderTrades() {
 
                         <!-- スマホ用：フッター配置 -->
                         <div class="trade-footer-grid mobile-only">
+                            <div class="date-check-row">
+                                <label class="tag-check ${t.is_packed?'done':''} ${!isTradeContracted?'disabled':''}">
+                                    <input type="checkbox" ${t.is_packed?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_packed', this.checked)"> 梱包済
+                                </label>
+                            </div>
                             <div class="date-check-row">
                                 <div class="date-input-wrap">
                                     <span class="d-label">発送予定:</span>
@@ -802,11 +835,11 @@ window.quickStatusChange = async (id, newS) => {
     const t = tradesData.find(x => String(x.id) === String(id));
     if (!t) return;
     const newT = JSON.parse(JSON.stringify(t)); newT.status = newS;
-    if (newS !== '成約') { newT.is_sent = false; newT.is_received = false; }
+    if (newS !== '成約') { newT.is_packed = false; newT.is_sent = false; newT.is_received = false; }
     
     // DB更新を先行し、結果を確実に受け取る (select()を使用)
     const { data: saved, error } = await sb.from('trades').update({ 
-        status: newS, is_sent: newT.is_sent, is_received: newT.is_received 
+        status: newS, is_packed: newT.is_packed ?? t.is_packed ?? false, is_sent: newT.is_sent, is_received: newT.is_received 
     }).eq('id', id).select();
     
     if (error || !saved?.[0]) {
@@ -856,6 +889,7 @@ window.editTrade = (id) => {
     $('trade-id').value = t.id; $('trade-name').value = t.name; $('trade-type').value = t.type; $('trade-status').value = t.status;
     $('trade-give-price').value = t.give_price; $('trade-receive-price').value = t.receive_price;
     $('trade-memo').value = t.memo || '';
+    $('trade-is-packed').checked = t.is_packed || false;
     $('trade-is-sent').checked = t.is_sent; $('trade-is-received').checked = t.is_received;
     $('trade-est-ship-date').value = t.est_ship_date || ''; $('trade-est-receive-date').value = t.est_receive_date || '';
 
