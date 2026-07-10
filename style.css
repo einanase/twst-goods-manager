@@ -1,48 +1,46 @@
 :root {
-    --bg-color: #0b0214;
-    --panel-bg: rgba(30, 20, 45, 0.85);
-    --accent-gold: #d4af37;
-    --accent-red: #8b0000;
-    --text-color: #f5f5dc;
-    --secondary-text: #b8a9c9;
-    --border-color: rgba(212, 175, 55, 0.4);
-    --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
-    --highlight: rgba(212, 175, 55, 0.2);
+    --bg-color: #f4f6fb;
+    --panel-bg: #ffffff;
+    --accent-gold: #2563eb;
+    --accent-red: #dc2626;
+    --text-color: #111827;
+    --secondary-text: #64748b;
+    --border-color: #d8e0ec;
+    --shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    --highlight: rgba(37, 99, 235, 0.1);
+    --success-color: #0f766e;
+    --surface-muted: #eef2f7;
 }
 
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: 'Shippori Mincho', serif;
+    font-family: 'Noto Sans JP', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 body {
     background-color: var(--bg-color);
-    background-image: 
-        radial-gradient(circle at 50% 50%, rgba(50, 20, 80, 0.3) 0%, transparent 80%),
-        url('https://www.transparenttextures.com/patterns/dark-leather.png');
     color: var(--text-color);
     min-height: 100vh;
 }
 
 h1, h2, h3, .logo {
-    font-family: 'Cinzel', serif;
     color: var(--accent-gold);
-    text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
     white-space: nowrap;
 }
 
 .hidden { display: none !important; }
 
-/* フォーム共通スタイル：宵闇のゴールドで統一 */
+/* フォーム共通スタイル */
 input, select, textarea,
 #trade-name, #trade-type, #trade-status, #trade-est-ship-date, #trade-est-receive-date,
 #trade-give-price, #trade-receive-price, #trade-memo,
-#goods-name, #goods-type, #goods-char, #goods-count {
-    background: rgba(10, 5, 20, 0.9) !important;
-    border: 1.5px solid var(--accent-gold) !important;
-    color: #fff !important;
+#goods-name, #goods-type, #goods-char, #goods-count,
+#signup-email, #signup-password, #signup-password-confirm {
+    background: #fff !important;
+    border: 1.5px solid var(--border-color) !important;
+    color: var(--text-color) !important;
     padding: 10px 14px;
     border-radius: 8px;
     outline: none;
@@ -50,13 +48,13 @@ input, select, textarea,
     transition: 0.3s;
 }
 option {
-    background: #1a0a2a;
-    color: #fff;
+    background: #fff;
+    color: var(--text-color);
 }
 input:focus, select:focus, textarea:focus {
-    background: rgba(0, 0, 0, 0.8) !important;
-    box-shadow: 0 0 12px rgba(212, 175, 55, 0.5);
-    border-color: #fff !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+    border-color: var(--accent-gold) !important;
 }
 input[type="date"]::-webkit-calendar-picker-indicator {
     filter: invert(1);
@@ -64,30 +62,58 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 /* 日付入力の文字色（Safari/Chrome対策） */
 input[type="date"] {
-    color-scheme: dark;
+    color-scheme: light;
 }
 
 /* ログイン・認証 */
 .auth-overlay {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.9);
+    background: rgba(15, 23, 42, 0.34);
+    backdrop-filter: blur(10px);
     display: flex; justify-content: center; align-items: center;
     z-index: 2000;
 }
 
-.main-auth-panel { text-align: center; }
-.auth-message { margin-top: 1rem; color: var(--accent-red); font-size: 0.9rem; }
+.main-auth-panel {
+    text-align: center;
+    max-width: 560px;
+}
+.main-auth-panel p {
+    color: var(--secondary-text);
+    line-height: 1.7;
+    margin: 0.4rem 0 1.1rem;
+    text-wrap: balance;
+}
+.auth-message { margin-top: 1rem; color: var(--accent-red); font-size: 0.9rem; line-height: 1.6; }
+.auth-message.success { color: var(--success-color); }
+.main-auth-panel .form-group {
+    display: grid;
+    grid-template-columns: 8.5rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+    text-align: left;
+}
+.main-auth-panel .form-group label {
+    text-align: right;
+    white-space: nowrap;
+    font-weight: 500;
+}
+.main-auth-panel .form-group input {
+    width: 100%;
+    min-width: 0;
+}
 
 /* ナビゲーション */
 .main-nav {
     display: flex; flex-direction: row; justify-content: space-between; align-items: center;
-    padding: 1rem 1.5rem; border-bottom: 2px solid var(--accent-gold);
-    background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px);
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(8px);
     position: sticky; top: 0; z-index: 100;
 }
 
-.logo { font-size: 1.4rem; letter-spacing: 0.05em; margin-bottom: 0.2rem; }
+.logo { font-size: 1.25rem; letter-spacing: 0; margin-bottom: 0.2rem; }
 .nav-left {
     display: flex;
     flex-direction: column;
@@ -106,8 +132,8 @@ input[type="date"] {
     white-space: nowrap;
 }
 .nav-btn.active {
-    background: var(--accent-gold); color: var(--bg-color);
-    font-weight: bold; box-shadow: 0 0 10px var(--accent-gold);
+    background: var(--accent-gold); color: #fff;
+    font-weight: bold; box-shadow: none;
 }
 
 /* メイン */
@@ -123,10 +149,10 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     gap: 1.2rem;
     margin-bottom: 1.5rem;
     padding: 0.8rem 1.2rem;
-    background: rgba(212, 175, 55, 0.08);
-    border-radius: 12px;
-    border: 1px solid var(--accent-gold);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    background: var(--panel-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
     flex-wrap: wrap; /* スマホでの折り返し対応 */
     justify-content: space-between;
 }
@@ -142,10 +168,10 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 }
 .view-toggle {
     display: flex;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--surface-muted);
     padding: 3px;
     border-radius: 8px;
-    border: 1px solid rgba(212, 175, 55, 0.3);
+    border: 1px solid var(--border-color);
 }
 .toggle-btn {
     background: transparent;
@@ -160,11 +186,11 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 }
 .toggle-btn.active {
     background: var(--accent-gold);
-    color: var(--bg-color);
-    box-shadow: 0 0 12px var(--accent-gold);
+    color: #fff;
+    box-shadow: none;
 }
 .toggle-btn:not(.active):hover {
-    background: rgba(212, 175, 55, 0.2);
+    background: var(--highlight);
 }
 
 .search-input { width: 140px; padding: 0.5rem; font-size: 0.9rem; border: 1px solid var(--border-color); border-radius: 4px; }
@@ -177,9 +203,9 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     flex-wrap: wrap;
 }
 .trade-filters select {
-    background: rgba(0,0,0,0.4);
-    border: 1px solid var(--accent-gold);
-    color: var(--accent-gold);
+    background: #fff;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
     padding: 6px 14px;
     border-radius: 4px;
     font-size: 0.9rem;
@@ -187,16 +213,23 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     transition: 0.2s;
 }
 .trade-filters select:hover {
-    background: rgba(212, 175, 55, 0.15);
+    border-color: var(--accent-gold);
 }
 
 /* ボタン */
 .primary-btn {
-    background: linear-gradient(135deg, var(--accent-gold), #b8860b);
-    color: var(--bg-color); border: none; padding: 0.5rem 1rem;
+    background: var(--accent-gold);
+    color: #fff; border: none; padding: 0.5rem 1rem;
     cursor: pointer; font-weight: bold; border-radius: 4px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.2s;
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18); transition: 0.2s;
     white-space: nowrap;
+}
+
+.utility-btn {
+    margin-top: 1.5rem;
+    margin-bottom: 2rem;
+    width: 100%;
+    opacity: 0.8;
 }
 
 /* 在庫：完全1行リスト形式 */
@@ -246,10 +279,10 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 }
 
 .actual-control {
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--surface-muted);
     padding: 4px 12px;
     border-radius: 20px;
-    border: 1px solid rgba(212, 175, 55, 0.2);
+    border: 1px solid var(--border-color);
 }
 
 .count-label {
@@ -270,15 +303,15 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    background: rgba(0,0,0,0.2);
+    background: var(--surface-muted);
     padding: 2px 8px;
     border-radius: 20px;
 }
 
 .count-display { font-size: 1.2rem; font-weight: bold; color: var(--accent-gold); }
 .count-btn {
-    background: transparent; border: 1px solid var(--secondary-text);
-    color: var(--secondary-text); width: 24px; height: 24px;
+    background: #fff; border: 1px solid var(--border-color);
+    color: var(--accent-gold); width: 24px; height: 24px;
     border-radius: 50%; cursor: pointer; display: flex;
     justify-content: center; align-items: center; font-size: 1rem;
 }
@@ -296,8 +329,8 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 
 .goods-image-card {
     background: var(--panel-bg);
-    border: 2px solid var(--border-color);
-    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -305,12 +338,12 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     transition: 0.3s;
 }
 
-.goods-image-card:hover { border-color: var(--accent-gold); transform: translateY(-4px); }
+.goods-image-card:hover { border-color: var(--accent-gold); transform: translateY(-2px); }
 
 .gic-image-wrap {
     width: 100%;
     aspect-ratio: 1/1;
-    background: rgba(0,0,0,0.5);
+    background: #f8fafc;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -360,13 +393,13 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 .gic-label { font-size: 0.75rem; color: var(--secondary-text); }
 .gic-num { font-size: 1.1rem; font-weight: bold; }
 .gic-num.planned { color: var(--secondary-text); opacity: 0.8; }
-.gic-num.actual { color: #fff; }
+.gic-num.actual { color: var(--text-color); }
 
 .gic-controls {
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    background: rgba(0,0,0,0.2);
+    background: var(--surface-muted);
     padding: 2px 8px;
     border-radius: 20px;
 }
@@ -382,7 +415,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 /* 取引リスト */
 .trade-card {
     background: var(--panel-bg); border: 1px solid var(--border-color);
-    padding: 1.2rem; border-radius: 12px; margin-bottom: 1.2rem;
+    padding: 1.2rem; border-radius: 8px; margin-bottom: 1.2rem;
     display: flex; flex-direction: column; gap: 1rem;
     box-shadow: var(--shadow);
 }
@@ -395,23 +428,22 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     margin-bottom: 0.5rem;
     letter-spacing: 0.05em;
 }
-.trade-label.give { background: #8b0000; color: #fff; box-shadow: 0 0 8px rgba(139,0,0,0.4); }
-.trade-label.receive { background: #1b4d3e; color: #fff; box-shadow: 0 0 8px rgba(27,77,62,0.4); }
+.trade-label.give { background: var(--accent-red); color: #fff; box-shadow: 0 0 8px rgba(220,38,38,0.22); }
+.trade-label.receive { background: var(--success-color); color: #fff; box-shadow: 0 0 8px rgba(15,118,110,0.25); }
 
 /* 取引番号バッジ */
 .trade-number-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--accent-gold), #b8860b);
-    color: var(--bg-color);
-    font-family: 'Cinzel', serif;
+    background: var(--accent-gold);
+    color: #fff;
     font-weight: bold;
     font-size: 0.85rem;
     min-width: 2.2em;
     padding: 2px 8px;
     border-radius: 6px;
-    box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+    box-shadow: none;
     flex-shrink: 0;
     letter-spacing: 0.02em;
 }
@@ -434,13 +466,13 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 
 /* 一覧からのステータス変更用セレクト */
 .status-quick-change {
-    background: rgba(0,0,0,0.4); border: 1px solid var(--accent-gold);
-    color: var(--accent-gold); padding: 4px 8px; font-size: 0.85rem; border-radius: 4px;
+    background: #fff; border: 1px solid var(--border-color);
+    color: var(--text-color); padding: 4px 8px; font-size: 0.85rem; border-radius: 4px;
     width: auto;
 }
 
 .trade-date-input {
-    background: rgba(0,0,0,0.2);
+    background: #fff;
     border: 1px solid var(--border-color);
     color: var(--text-color);
     font-size: 0.85rem;
@@ -467,12 +499,12 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     text-overflow: ellipsis;
 }
 .t-type { color: var(--secondary-text); font-size: 0.8rem; }
-.t-char { color: var(--accent-gold); font-weight: bold; text-shadow: 0 0 5px rgba(212,175,55,0.3); }
+.t-char { color: var(--accent-gold); font-weight: bold; }
 .t-count { 
     flex-shrink: 0;
-    color: #fff; 
+    color: var(--accent-gold); 
     font-weight: bold; 
-    background: rgba(212, 175, 55, 0.25);
+    background: var(--highlight);
     padding: 0 6px;
     border-radius: 4px;
     font-size: 0.85rem;
@@ -502,11 +534,11 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     height: auto;
     max-height: 250px;
     object-fit: contain;
-    border: 2px solid var(--accent-gold);
-    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
     cursor: pointer;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-    background: rgba(0,0,0,0.3);
+    box-shadow: var(--shadow);
+    background: #f8fafc;
 }
 
 /* デスクトップ用日付配置 (指示④: 日付の横にチェックボックス) */
@@ -528,7 +560,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     font-size: 0.85rem;
     padding: 0.3rem 0.8rem;
     border-radius: 4px;
-    background: rgba(40,40,40,0.6);
+    background: #fff;
     border: 1px solid var(--border-color);
     cursor: pointer;
     color: var(--secondary-text);
@@ -536,7 +568,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 }
 .tag-inline.done {
     background: var(--accent-gold);
-    color: var(--bg-color);
+    color: #fff;
     font-weight: bold;
     border-color: var(--accent-gold);
 }
@@ -545,7 +577,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 .trade-memo-box {
     margin-top: 1rem;
     padding: 1rem;
-    background: rgba(255,255,255,0.03);
+    background: #f8fafc;
     border-radius: 6px;
     border: 1px solid var(--border-color);
     font-size: 0.95rem;
@@ -589,7 +621,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     gap: 0.4rem;
     font-size: 0.85rem;
     padding: 0.5rem 1rem;
-    background: rgba(255,255,255,0.05);
+    background: #fff;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     cursor: pointer;
@@ -597,21 +629,21 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     justify-content: center;
     transition: 0.2s;
 }
-.tag-check.done { background: var(--accent-gold); color: var(--bg-color); font-weight: bold; }
+.tag-check.done { background: var(--accent-gold); color: #fff; font-weight: bold; }
 .tag-check.disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* その他共通 */
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-.glass-panel { background: rgba(30, 20, 50, 0.98); border: 2px solid var(--accent-gold); padding: 2rem; border-radius: 12px; width: 95%; max-width: 500px; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.42); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(6px); }
+.glass-panel { background: #fff; border: 1px solid var(--border-color); padding: 2rem; border-radius: 8px; width: 95%; max-width: 500px; box-shadow: var(--shadow); }
 .large-modal { max-width: 850px; max-height: 90vh; overflow-y: auto; }
 
 .image-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; justify-content: center; align-items: center; z-index: 2000; }
-#overlay-img { max-width: 95%; max-height: 95%; border: 3px solid var(--accent-gold); }
+#overlay-img { max-width: 95%; max-height: 95%; border: 3px solid #fff; border-radius: 8px; }
 
 .trade-thumb {
     width: 230px; height: auto; max-height: 230px; object-fit: contain;
-    border: 2px solid var(--accent-gold); border-radius: 12px; cursor: pointer;
-    box-shadow: 0 4px 30px rgba(0,0,0,0.6); background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer;
+    box-shadow: var(--shadow); background: #f8fafc;
 }
 
 .mobile-only { display: none !important; }
@@ -623,24 +655,24 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     display: flex; gap: 0.6rem; margin-bottom: 0.6rem; align-items: center;
 }
 .item-row-compact select {
-    flex: 3; min-width: 0; background: rgba(0,0,0,0.3); color: #fff;
+    flex: 3; min-width: 0; background: #fff; color: var(--text-color);
     border: 1px solid var(--border-color); padding: 8px 10px; border-radius: 8px;
     font-size: 0.9rem;
 }
 .trade-count-control {
     flex: 0 0 auto; min-width: 110px;
     display: flex; align-items: center; gap: 0.3rem;
-    background: rgba(0,0,0,0.4); padding: 4px 6px; border-radius: 25px;
-    border: 1px solid rgba(212,175,55,0.4);
+    background: var(--surface-muted); padding: 4px 6px; border-radius: 25px;
+    border: 1px solid var(--border-color);
     justify-content: space-between;
 }
 .trade-count-control .item-count {
     width: 25px; text-align: center; font-weight: bold; color: var(--accent-gold);
-    font-size: 1rem; font-family: 'Cinzel', serif;
+    font-size: 1rem;
 }
 .trade-count-control .count-btn {
     width: 26px; height: 26px; border-radius: 50%; background: var(--accent-gold);
-    color: #000; border: none; font-weight: bold; cursor: pointer;
+    color: #fff; border: none; font-weight: bold; cursor: pointer;
     display: flex; justify-content: center; align-items: center;
     transition: 0.2s;
     font-size: 0.9rem;
@@ -652,7 +684,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 }
 .modal-preview-img {
     max-height: 150px; max-width: 100%; border-radius: 8px; border: 2px solid var(--accent-gold);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.5); background: #000;
+    box-shadow: var(--shadow); background: #f8fafc;
 }
 .remove-img-btn {
     position: absolute; top: -10px; right: -10px; width: 28px; height: 28px;
@@ -664,14 +696,47 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 .remove-img-btn:hover { background: #c0392b; transform: scale(1.1); }
 
 #trade-memo {
-    width: 100%; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid var(--border-color);
+    width: 100%; background: #fff; color: var(--text-color); border: 1px solid var(--border-color);
     padding: 10px; border-radius: 6px; font-size: 0.9rem; resize: vertical;
 }
 
 .form-group.full-width { grid-column: span 2; }
 
+.modal-actions {
+    display: flex;
+    gap: 0.7rem;
+    align-items: stretch;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+.modal-actions .primary-btn,
+.modal-actions .nav-btn {
+    flex: 1;
+    min-height: 42px;
+}
+.auth-footer .nav-btn {
+    min-height: 40px;
+}
+
 @media (max-width: 600px) {
+    body { background: #f8fafc; }
+    main { margin: 1rem auto; padding: 0 0.75rem; }
+
+    .modal { align-items: flex-end; }
     .glass-panel { padding: 1.2rem 0.8rem; }
+    .modal .glass-panel {
+        border-radius: 14px 14px 0 0;
+        max-height: 92vh;
+        overflow-y: auto;
+    }
+    .main-auth-panel { max-width: calc(100% - 1.5rem); border-radius: 12px; }
+    .main-auth-panel .form-group {
+        grid-template-columns: 1fr;
+        gap: 0.35rem;
+    }
+    .main-auth-panel .form-group label {
+        text-align: left;
+    }
     .form-group.full-width { grid-column: span 1; }
     .mobile-only { display: block !important; }
     .desktop-only { display: none !important; }
@@ -685,8 +750,15 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 
     /* セクションヘッダーの回り込み防止 */
     .section-header { flex-direction: column; align-items: flex-start; gap: 0.8rem; width: 100%; }
-    .header-actions { width: 100%; display: flex; gap: 0.6rem; align-items: stretch; }
+    .header-actions { width: 100%; display: grid; grid-template-columns: 1fr; gap: 0.6rem; align-items: stretch; }
     .search-input { flex: 1; width: auto; min-width: 0; }
+    .header-actions .primary-btn,
+    .header-actions .search-input,
+    .trade-filters select {
+        width: 100%;
+        min-height: 42px;
+    }
+    .trade-filters { display: grid; grid-template-columns: 1fr; gap: 0.6rem; }
 
     /* スマホ版の調整: グリッドで名前・ボタン・画像・情報を再配置 */
     .trade-card-grid {
@@ -708,9 +780,11 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     .t-type { font-size: 0.75rem; }
     .t-count { font-size: 0.8rem; }
 
-    .main-nav { flex-direction: column; padding: 0.8rem; gap: 0.5rem; }
-    .nav-links { width: 100%; justify-content: space-around; }
-    .nav-btn { flex: 1; font-size: 0.8rem; padding: 0.5rem 0.2rem; }
+    .main-nav { flex-direction: column; padding: 0.8rem; gap: 0.6rem; }
+    .nav-left { width: 100%; align-items: center; text-align: center; }
+    .logo { font-size: 1.05rem; white-space: normal; }
+    .nav-links { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.4rem; }
+    .nav-btn { flex: 1; font-size: 0.8rem; padding: 0.55rem 0.2rem; min-height: 40px; }
 
     .goods-card.single-line { 
         flex-direction: column; 
@@ -741,7 +815,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 }
 .sortable-chosen {
     border-color: var(--accent-gold) !important;
-    box-shadow: 0 0 20px rgba(212, 175, 55, 0.5) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16) !important;
 }
 
 /* ドラッグハンドル */
@@ -770,7 +844,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 /* リスト形式での配置 */
 .goods-card.single-line .drag-handle {
     padding-right: 8px;
-    border-right: 1px solid rgba(212, 175, 55, 0.2);
+    border-right: 1px solid var(--border-color);
     margin-right: 4px;
 }
 
@@ -780,7 +854,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     top: 8px;
     left: 8px;
     z-index: 10;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(255, 255, 255, 0.86);
     backdrop-filter: blur(4px);
     width: 32px;
     height: 32px;
@@ -816,7 +890,6 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 }
 .gic-num {
     font-size: 1.1rem;
-    font-family: 'Cinzel', serif;
 }
 @media (max-width: 600px) {
     .gic-label { font-size: 0.7rem; }
@@ -843,14 +916,14 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     border: none !important;
 }
 .modal-actions .confirm-btn {
-    background: linear-gradient(135deg, var(--accent-gold), #b8860b) !important;
-    color: #000 !important;
-    box-shadow: 0 4px 15px rgba(212,175,55,0.3);
+    background: var(--accent-gold) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 18px rgba(37,99,235,0.18);
 }
 .modal-actions .cancel-btn {
-    background: rgba(255,255,255,0.05) !important;
+    background: #f8fafc !important;
     color: var(--secondary-text) !important;
-    border: 1px solid rgba(255,255,255,0.2) !important;
+    border: 1px solid var(--border-color) !important;
 }
 
 /* 一覧などのミニボタンとしてのキャンセルボタンはnav-btnに合わせる */
@@ -860,7 +933,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     color: var(--accent-gold) !important;
 }
 .nav-btn.cancel-btn:hover {
-    background: rgba(212, 175, 55, 0.1) !important;
+    background: var(--highlight) !important;
 }
 
 /* ファイル入力の装飾 */
@@ -868,17 +941,17 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     display: flex; flex-direction: column; gap: 0.5rem;
 }
 .file-input {
-    width: 100%; padding: 12px; background: rgba(212,175,55,0.05);
-    border: 1px dashed var(--accent-gold); border-radius: 8px; color: var(--accent-gold);
+    width: 100%; padding: 12px; background: #f8fafc;
+    border: 1px dashed var(--border-color); border-radius: 8px; color: var(--secondary-text);
     font-size: 0.9rem; margin-top: 0.5rem;
 }
 .file-input::-webkit-file-upload-button {
-    background: var(--accent-gold); color: #000; border: none;
+    background: var(--accent-gold); color: #fff; border: none;
     padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer;
     margin-right: 12px; transition: 0.2s;
     font-size: 0.9rem;
 }
-.file-input::-webkit-file-upload-button:hover { background: #fff; }
+.file-input::-webkit-file-upload-button:hover { background: #1d4ed8; }
 
 /* --------------------------------------------------
    グッズ詳細モーダル（取引一覧表示）
@@ -891,7 +964,6 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 }
 
 .gd-title {
-    font-family: 'Cinzel', serif;
     font-size: 1.1rem;
     color: var(--accent-gold);
     text-align: center;
@@ -918,15 +990,15 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 }
 
 .gd-section-header.pending {
-    background: rgba(139, 0, 0, 0.25);
-    border: 1px solid rgba(139, 0, 0, 0.5);
-    color: #ff8080;
+    background: rgba(220, 38, 38, 0.08);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    color: #b91c1c;
 }
 
 .gd-section-header.shipped {
-    background: rgba(27, 77, 62, 0.3);
-    border: 1px solid rgba(74, 180, 150, 0.4);
-    color: #6ecfb0;
+    background: rgba(15, 118, 110, 0.08);
+    border: 1px solid rgba(15, 118, 110, 0.2);
+    color: var(--success-color);
 }
 
 .gd-trade-row {
@@ -934,7 +1006,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     align-items: center;
     gap: 0.8rem;
     padding: 0.55rem 0.8rem;
-    background: rgba(255, 255, 255, 0.03);
+    background: #f8fafc;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     margin-bottom: 0.45rem;
@@ -954,13 +1026,13 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 
 .gd-trade-count {
     flex-shrink: 0;
-    background: rgba(212, 175, 55, 0.2);
-    color: #fff;
+    background: var(--highlight);
+    color: var(--accent-gold);
     font-weight: bold;
     font-size: 0.85rem;
     padding: 2px 10px;
     border-radius: 12px;
-    border: 1px solid rgba(212, 175, 55, 0.4);
+    border: 1px solid rgba(37, 99, 235, 0.2);
     white-space: nowrap;
 }
 
@@ -975,15 +1047,15 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 }
 
 .gd-badge.give {
-    background: rgba(139, 0, 0, 0.5);
-    color: #ffaaaa;
-    border: 1px solid rgba(139, 0, 0, 0.7);
+    background: rgba(220, 38, 38, 0.08);
+    color: #b91c1c;
+    border: 1px solid rgba(220, 38, 38, 0.2);
 }
 
 .gd-badge.receive {
-    background: rgba(27, 77, 62, 0.5);
-    color: #aaf0d1;
-    border: 1px solid rgba(27, 77, 62, 0.7);
+    background: rgba(15, 118, 110, 0.08);
+    color: var(--success-color);
+    border: 1px solid rgba(15, 118, 110, 0.2);
 }
 
 .gd-status-chip {
@@ -992,8 +1064,8 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     padding: 2px 7px;
     border-radius: 10px;
     color: var(--secondary-text);
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255,255,255,0.1);
+    background: #fff;
+    border: 1px solid var(--border-color);
     white-space: nowrap;
 }
 
@@ -1010,8 +1082,8 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     width: 100%;
     margin-top: 1.2rem;
     padding: 12px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.2);
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
     border-radius: 10px;
     color: var(--secondary-text);
     font-size: 1rem;
@@ -1021,7 +1093,7 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
     font-family: inherit;
 }
 .gd-close-btn:hover {
-    background: rgba(212, 175, 55, 0.15);
+    background: var(--highlight);
     border-color: var(--accent-gold);
     color: var(--accent-gold);
 }
@@ -1034,14 +1106,14 @@ main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
 
 /* 「取引確認」ボタン */
 .trade-check-btn {
-    background: rgba(212, 175, 55, 0.15) !important;
+    background: var(--highlight) !important;
     border-color: var(--accent-gold) !important;
     color: var(--accent-gold) !important;
     font-weight: bold;
 }
 .trade-check-btn:hover {
-    background: rgba(212, 175, 55, 0.35) !important;
-    box-shadow: 0 0 8px rgba(212, 175, 55, 0.4);
+    background: rgba(37, 99, 235, 0.16) !important;
+    box-shadow: none;
 }
 
 @media (max-width: 600px) {

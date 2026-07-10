@@ -1,17 +1,34 @@
+const APP_NAME = 'グッズ交換管理';
 const SUPABASE_URL = 'https://ykitplwgpgbidrnrqdan.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_hTSlL77g5EE0v9Y-tAjJEA_oSqBfopL';
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const hasSupabaseSdk = typeof supabase !== 'undefined' && typeof supabase.createClient === 'function';
+const sb = hasSupabaseSdk ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+const STORAGE_KEYS = {
+    inventoryView: 'goods_trade_inventory_view',
+    activeSection: 'goods_trade_active_section',
+    localGoods: 'goods_trade_goods',
+    legacyInventoryView: 'twst_inventory_view',
+    legacyActiveSection: 'twst_active_section',
+    legacyLocalGoods: 'twst_goods'
+};
+
+const AUTH_CONNECTION_MESSAGE = `認証サーバーに接続できません。アプリ管理者は Supabase の接続先（${SUPABASE_URL}）と API キーを確認してください。`;
+const AUTH_SDK_MESSAGE = '認証ライブラリを読み込めませんでした。ネットワーク接続、または Supabase SDK の読み込み設定を確認してください。';
+const STORAGE_BUCKET = 'mailing-images';
+const SIGNED_IMAGE_URL_TTL = 60 * 60;
+const signedImageUrlCache = new Map();
+let authEndpointAvailable = null;
 
 let currentUser = null;
 let goodsData = [];
 let tradesData = [];
 let isRecovering = false;
-let currentInventoryView = localStorage.getItem('twst_inventory_view') || 'list';
+let currentInventoryView = readLocalSetting(STORAGE_KEYS.inventoryView, STORAGE_KEYS.legacyInventoryView, 'list');
 
 // アプリバージョン
-const APP_VERSION = '1.2 (Defensive Sync Fix)';
-console.log(`%ctwst-goods-manager ${APP_VERSION}`, 'color: #d4af37; font-weight: bold; font-size: 1.2rem;');
+const APP_VERSION = '1.4 (Signup Flow & Private Images)';
+console.log(`%c${APP_NAME} ${APP_VERSION}`, 'color: #2563eb; font-weight: bold; font-size: 1.2rem;');
 
 // グローバルエラーハンドリング（どこかで失敗したら即通知）
 window.addEventListener('unhandledrejection', event => {
@@ -31,38 +48,292 @@ const $ = (id) => document.getElementById(id);
 const show = (id) => $(id)?.classList.remove('hidden');
 const hide = (id) => $(id)?.classList.add('hidden');
 
+function readLocalSetting(key, legacyKey, fallback) {
+    const saved = localStorage.getItem(key);
+    if (saved !== null) return saved;
+
+    const legacy = legacyKey ? localStorage.getItem(legacyKey) : null;
+    if (legacy !== null) {
+        localStorage.setItem(key, legacy);
+        return legacy;
+    }
+
+    return fallback;
+}
+
+function setAuthMessage(message, target = 'auth-message', type = 'error') {
+    const el = $(target);
+    if (!el) return;
+    el.textContent = message;
+    el.classList.toggle('success', Boolean(message) && type === 'success');
+}
+
+function formatAuthError(prefix, error) {
+    const message = error?.message || String(error || '');
+    if (message === 'Failed to fetch' || message.includes('NetworkError') || message.includes('fetch')) {
+        return `${prefix}: ${AUTH_CONNECTION_MESSAGE}`;
+    }
+    return `${prefix}: ${message}`;
+}
+
+async function checkAuthEndpoint() {
+    if (!hasSupabaseSdk || !sb) {
+        authEndpointAvailable = false;
+        setAuthMessage(AUTH_SDK_MESSAGE);
+        return false;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+
+    try {
+        const response = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
+            method: 'GET',
+            cache: 'no-store',
+            headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: `Bearer ${SUPABASE_KEY}`
+            },
+            signal: controller.signal
+        });
+        authEndpointAvailable = response.ok;
+        if (!response.ok) {
+            setAuthMessage(`${AUTH_CONNECTION_MESSAGE}（HTTP ${response.status}）`);
+        }
+        return response.ok;
+    } catch (error) {
+        authEndpointAvailable = false;
+        console.warn('Auth endpoint check failed:', error);
+        setAuthMessage(AUTH_CONNECTION_MESSAGE);
+        return false;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function ensureAuthReady() {
+    if (!hasSupabaseSdk || !sb) {
+        setAuthMessage(AUTH_SDK_MESSAGE);
+        return false;
+    }
+
+    return true;
+}
+
+function getAuthRedirectUrl() {
+    if (!['http:', 'https:'].includes(window.location.protocol)) return undefined;
+    return `${window.location.origin}${window.location.pathname}`;
+}
+
+function getAuthCredentials({
+    emailId = 'auth-email',
+    passwordId = 'auth-password',
+    confirmPasswordId = null,
+    messageTarget = 'auth-message'
+} = {}) {
+    const email = $(emailId).value.trim();
+    const password = $(passwordId).value;
+    const confirmPassword = confirmPasswordId ? $(confirmPasswordId).value : null;
+
+    if (!email || !password) {
+        setAuthMessage('メールアドレスとパスワードを入力してください。', messageTarget);
+        return null;
+    }
+
+    if (password.length < 6) {
+        setAuthMessage('パスワードは6文字以上で入力してください。', messageTarget);
+        return null;
+    }
+
+    if (confirmPasswordId && password !== confirmPassword) {
+        setAuthMessage('確認用パスワードが一致していません。', messageTarget);
+        return null;
+    }
+
+    return { email, password };
+}
+
+function openSignupSection() {
+    $('signup-email').value = $('auth-email').value.trim();
+    $('signup-password').value = '';
+    $('signup-password-confirm').value = '';
+    setAuthMessage('', 'auth-message');
+    setAuthMessage('', 'signup-message');
+    hide('auth-section');
+    show('signup-section');
+    $('signup-email').focus();
+}
+
+function closeSignupSection() {
+    if ($('signup-email').value.trim()) {
+        $('auth-email').value = $('signup-email').value.trim();
+    }
+    setAuthMessage('', 'signup-message');
+    hide('signup-section');
+    show('auth-section');
+    $('auth-email').focus();
+}
+
+function escapeAttr(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[ch]));
+}
+
+function escapeHtml(value) {
+    return escapeAttr(value);
+}
+
+function jsStringArg(value) {
+    return escapeAttr(JSON.stringify(String(value ?? '')));
+}
+
+function getStoragePath(imageValue) {
+    const raw = String(imageValue || '').trim();
+    if (!raw || raw.startsWith('blob:') || raw.startsWith('data:')) return '';
+
+    if (!/^https?:\/\//i.test(raw)) {
+        return raw.replace(/^\/+/, '');
+    }
+
+    try {
+        const url = new URL(raw);
+        const markers = [
+            `/storage/v1/object/public/${STORAGE_BUCKET}/`,
+            `/storage/v1/object/sign/${STORAGE_BUCKET}/`
+        ];
+        const marker = markers.find(m => url.pathname.includes(m));
+        if (!marker) return '';
+        return decodeURIComponent(url.pathname.slice(url.pathname.indexOf(marker) + marker.length));
+    } catch (error) {
+        console.warn('画像パスの解析に失敗しました:', error);
+        return '';
+    }
+}
+
+function getStoredImageValue(imageValue) {
+    return getStoragePath(imageValue) || String(imageValue || '').trim();
+}
+
+async function getImageDisplayUrl(imageValue) {
+    const raw = String(imageValue || '').trim();
+    if (!raw) return '';
+
+    const path = getStoragePath(raw);
+    if (!path) return raw;
+
+    const cached = signedImageUrlCache.get(path);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.url;
+    }
+
+    const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, SIGNED_IMAGE_URL_TTL);
+    if (error || !data?.signedUrl) {
+        console.warn('署名付き画像URLの作成に失敗しました:', error);
+        return /^https?:\/\//i.test(raw) ? raw : '';
+    }
+
+    signedImageUrlCache.set(path, {
+        url: data.signedUrl,
+        expiresAt: Date.now() + (SIGNED_IMAGE_URL_TTL - 60) * 1000
+    });
+    return data.signedUrl;
+}
+
+async function attachDisplayImageUrls(rows) {
+    return Promise.all((rows || []).map(async row => ({
+        ...row,
+        image_storage_path: getStoragePath(row.image_url),
+        image_display_url: await getImageDisplayUrl(row.image_url)
+    })));
+}
+
+function getSafeImageExtension(fileName) {
+    const ext = String(fileName || '').split('.').pop().toLowerCase();
+    return /^[a-z0-9]{1,8}$/.test(ext) ? ext : 'jpg';
+}
+
+function makeImagePath(prefix, file) {
+    const ext = getSafeImageExtension(file.name);
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return `${currentUser.id}/${prefix}_${id}.${ext}`;
+}
+
+async function uploadPrivateImage(file, prefix) {
+    const path = makeImagePath(prefix, file);
+    const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, file, {
+        cacheControl: '3600',
+        contentType: file.type || undefined,
+        upsert: false
+    });
+    if (error) throw error;
+    signedImageUrlCache.delete(path);
+    return path;
+}
+
+async function removeStoredImage(imageValue) {
+    const path = getStoragePath(imageValue);
+    if (!path || !currentUser || !path.startsWith(`${currentUser.id}/`)) return;
+
+    const { error } = await sb.storage.from(STORAGE_BUCKET).remove([path]);
+    if (error) {
+        console.warn('古い画像の削除に失敗しました:', error);
+        return;
+    }
+    signedImageUrlCache.delete(path);
+}
+
 // --- ログイン・ログアウト ---
 window.handlePasswordReset = async () => {
     const email = $('auth-email').value;
     if (!email) {
-        alert('先にメールアドレスを入力してくださいね');
+        alert('先にメールアドレスを入力してください。');
         return;
     }
-    const { error } = await sb.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.href,
-    });
-    if (error) {
-        $('auth-message').textContent = "リセット失敗: " + error.message;
-    } else {
-        const msg = "再設定メールを送信しました！メールボックスを確認して、新しい合言葉（パスワード）を決めてくださいね。";
-        $('auth-message').textContent = msg;
-        alert(msg);
+    if (!await ensureAuthReady()) return;
+
+    try {
+        const redirectTo = getAuthRedirectUrl();
+        const { error } = await sb.auth.resetPasswordForEmail(email, {
+            redirectTo: redirectTo || window.location.href,
+        });
+        if (error) {
+            setAuthMessage(formatAuthError('リセット失敗', error));
+        } else {
+            const msg = "再設定メールを送信しました。メールボックスを確認して、新しいパスワードを設定してください。";
+            setAuthMessage(msg, 'auth-message', 'success');
+            alert(msg);
+        }
+    } catch (error) {
+        setAuthMessage(formatAuthError('リセット失敗', error));
     }
 };
 
 window.handlePasswordUpdate = async (e) => {
     e.preventDefault();
-    const newPassword = $('new-password').value;
-    const { error } = await sb.auth.updateUser({ password: newPassword });
-    if (error) {
-        $('update-message').textContent = "更新失敗: " + error.message;
-    } else {
-        alert("合言葉を新しく書き換えました！そのままお入りください。");
-        isRecovering = false;
-        hide('update-password-section');
-        // 更新が成功したのでURLを綺麗にする
-        history.replaceState(null, null, window.location.pathname + window.location.search);
-        initAuth(); // 状態を再確認してメイン画面へ
+    if (!await ensureAuthReady()) return;
+
+    try {
+        const newPassword = $('new-password').value;
+        const { error } = await sb.auth.updateUser({ password: newPassword });
+        if (error) {
+            setAuthMessage(formatAuthError('更新失敗', error), 'update-message');
+        } else {
+            alert("パスワードを更新しました。そのままご利用ください。");
+            isRecovering = false;
+            hide('update-password-section');
+            // 更新が成功したのでURLを綺麗にする
+            history.replaceState(null, null, window.location.pathname + window.location.search);
+            initAuth(); // 状態を再確認してメイン画面へ
+        }
+    } catch (error) {
+        setAuthMessage(formatAuthError('更新失敗', error), 'update-message');
     }
 };
 
@@ -86,6 +357,12 @@ window.handleLogout = async () => {
 
 // --- 認証 ---
 async function initAuth() {
+    if (!hasSupabaseSdk || !sb) {
+        handleAuthStateChange(null);
+        setAuthMessage(AUTH_SDK_MESSAGE);
+        return;
+    }
+
     // 1. URLハッシュを手動でチェック
     const hash = window.location.hash.substring(1);
     const params = new URLSearchParams(hash);
@@ -94,7 +371,7 @@ async function initAuth() {
     const errorMsg = params.get('error_description') || params.get('error');
     if (errorMsg) {
         const decodedMsg = decodeURIComponent(errorMsg.replace(/\+/g, ' '));
-        $('auth-message').textContent = "認証エラー: " + decodedMsg;
+        setAuthMessage("認証エラー: " + decodedMsg);
         // ユーザーが混乱しないよう、ハッシュをURLから消去
         history.replaceState(null, null, window.location.pathname + window.location.search);
     }
@@ -112,6 +389,7 @@ async function initAuth() {
     const { data: { session } } = await sb.auth.getSession();
     if (!isRecovering) {
         handleAuthStateChange(session);
+        if (!session) checkAuthEndpoint();
     }
 
     sb.auth.onAuthStateChange((event, session) => {
@@ -129,51 +407,83 @@ async function initAuth() {
     });
 }
 
-function handleAuthStateChange(session) {
-    if (isRecovering) return; // リカバリ中はログイン画面を表示しない
-    if (session) {
-        currentUser = session.user;
-        $('user-info').textContent = `Logged in as: ${currentUser.email}`;
-        hide('auth-section'); show('main-app');
-        fetchData();
-        checkAndMigrateLocalData();
-    } else {
-        currentUser = null;
-        $('user-info').textContent = '';
-        show('auth-section'); hide('main-app');
-    }
-}
-
 $('auth-form').onsubmit = async (e) => {
     e.preventDefault();
-    const email = $('auth-email').value;
-    const password = $('auth-password').value;
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) $('auth-message').textContent = "ログイン失敗: " + error.message;
+    if (!await ensureAuthReady()) return;
+
+    const credentials = getAuthCredentials();
+    if (!credentials) return;
+
+    try {
+        const { error } = await sb.auth.signInWithPassword(credentials);
+        if (error) setAuthMessage(formatAuthError('ログイン失敗', error));
+    } catch (error) {
+        setAuthMessage(formatAuthError('ログイン失敗', error));
+    }
 };
 
-$('signup-btn').onclick = async () => {
-    const email = $('auth-email').value;
-    const password = $('auth-password').value;
-    const { error } = await sb.auth.signUp({ email, password });
-    if (error) $('auth-message').textContent = "登録失敗: " + error.message;
-    else $('auth-message').textContent = "アカウントを作成しました。ログインしてください。";
+$('signup-btn').onclick = openSignupSection;
+$('back-to-login-btn').onclick = closeSignupSection;
+
+$('signup-form').onsubmit = async (e) => {
+    e.preventDefault();
+    if (!await ensureAuthReady()) return;
+
+    const credentials = getAuthCredentials({
+        emailId: 'signup-email',
+        passwordId: 'signup-password',
+        confirmPasswordId: 'signup-password-confirm',
+        messageTarget: 'signup-message'
+    });
+    if (!credentials) return;
+
+    try {
+        const redirectTo = getAuthRedirectUrl();
+        const { data, error } = await sb.auth.signUp({
+            ...credentials,
+            options: redirectTo ? { emailRedirectTo: redirectTo } : undefined
+        });
+        if (error) {
+            setAuthMessage(formatAuthError('登録失敗', error), 'signup-message');
+            return;
+        }
+
+        $('auth-email').value = credentials.email;
+        $('auth-password').value = '';
+
+        if (data?.session) {
+            setAuthMessage('アカウントを作成しました。ログイン中です。', 'signup-message', 'success');
+        } else {
+            setAuthMessage('アカウントを作成しました。確認メールが届いた場合は、メール内のリンクを開いてからログインしてください。', 'signup-message', 'success');
+        }
+    } catch (error) {
+        setAuthMessage(formatAuthError('登録失敗', error), 'signup-message');
+    }
 };
 
 
 // --- データ取得 ---
 async function fetchData() {
     console.log("Fetching latest data from Supabase...");
-    const { data: g, error: ge } = await sb.from('goods').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false });
-    const { data: t, error: te } = await sb.from('trades').select('*').order('created_at', { ascending: false });
+    const { data: g, error: ge } = await sb
+        .from('goods')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false });
+    const { data: t, error: te } = await sb
+        .from('trades')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false });
     
     if (ge || te) {
         console.error("Fetch error:", ge || te);
         throw new Error("データの取得に失敗しました");
     }
 
-    goodsData = g || [];
-    tradesData = t || [];
+    goodsData = await attachDisplayImageUrls(g || []);
+    tradesData = await attachDisplayImageUrls(t || []);
     console.log(`Data loaded: ${goodsData.length} items, ${tradesData.length} trades.`);
     
     renderInventory();
@@ -184,7 +494,7 @@ async function fetchData() {
 // --- 在庫管理 ---
 window.setInventoryView = (view) => {
     currentInventoryView = view;
-    localStorage.setItem('twst_inventory_view', view);
+    localStorage.setItem(STORAGE_KEYS.inventoryView, view);
     
     // UIボタンの状態更新
     if (view === 'gallery') {
@@ -214,23 +524,30 @@ function renderInventory() {
     const q = $('goods-search').value.toLowerCase();
     list.innerHTML = '';
     
-    const filteredGoods = goodsData.filter(g => g.char.toLowerCase().includes(q) || g.type.toLowerCase().includes(q));
+    const filteredGoods = goodsData.filter(g =>
+        String(g.char || '').toLowerCase().includes(q) ||
+        String(g.type || '').toLowerCase().includes(q)
+    );
 
     if (currentInventoryView === 'gallery') {
         list.className = 'goods-gallery-grid';
         filteredGoods.forEach(g => {
+            const imageSrc = escapeAttr(g.image_display_url || '');
+            const goodsIdArg = jsStringArg(g.id);
+            const goodsType = escapeHtml(g.type);
+            const goodsChar = escapeHtml(g.char);
             const card = document.createElement('div');
             card.className = 'goods-image-card';
             card.dataset.id = g.id; // 並べ替え用
             card.innerHTML = `
                 <div class="drag-handle" title="ドラッグして並び替え"></div>
-                <div class="gic-image-wrap" onclick="showOverlay('${g.image_url || ''}')">
-                    ${g.image_url ? `<img src="${g.image_url}" class="gic-img">` : '<span class="gic-no-img">No Image</span>'}
+                <div class="gic-image-wrap" onclick="showGoodsImage(${goodsIdArg})">
+                    ${imageSrc ? `<img src="${imageSrc}" class="gic-img">` : '<span class="gic-no-img">No Image</span>'}
                 </div>
                 <div class="gic-info">
                     <div class="gic-name">
-                        <span class="goods-type-label">${g.type}</span><br>
-                        <span style="color: var(--accent-gold); font-size: 1rem;">${g.char}</span>
+                        <span class="goods-type-label">${goodsType}</span><br>
+                        <span style="color: var(--accent-gold); font-size: 1rem;">${goodsChar}</span>
                     </div>
                     <div class="gic-counts">
                         <div class="gic-count-grid">
@@ -241,18 +558,18 @@ function renderInventory() {
                             <div class="gic-count-col">
                                 <span class="gic-label">実数</span>
                                 <div class="gic-controls">
-                                    <button class="count-btn" onclick="updateCount('${g.id}', -1); event.stopPropagation();">-</button>
+                                    <button class="count-btn" onclick="updateCount(${goodsIdArg}, -1); event.stopPropagation();">-</button>
                                     <span class="gic-num actual">${g.count}</span>
-                                    <button class="count-btn" onclick="updateCount('${g.id}', 1); event.stopPropagation();">+</button>
+                                    <button class="count-btn" onclick="updateCount(${goodsIdArg}, 1); event.stopPropagation();">+</button>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="gic-footer">
-                    <button class="nav-btn mini trade-check-btn" onclick="showGoodsDetail('${g.id}'); event.stopPropagation();">取引確認</button>
-                    <button class="nav-btn mini" onclick="editGoods('${g.id}'); event.stopPropagation();">編集</button>
-                    <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}'); event.stopPropagation();">削除</button>
+                    <button class="nav-btn mini trade-check-btn" onclick="showGoodsDetail(${goodsIdArg}); event.stopPropagation();">取引確認</button>
+                    <button class="nav-btn mini" onclick="editGoods(${goodsIdArg}); event.stopPropagation();">編集</button>
+                    <button class="nav-btn mini cancel-btn" onclick="deleteGoods(${goodsIdArg}); event.stopPropagation();">削除</button>
                 </div>
             `;
             list.appendChild(card);
@@ -260,6 +577,9 @@ function renderInventory() {
     } else {
         list.className = 'goods-compact-grid';
         filteredGoods.forEach(g => {
+            const goodsIdArg = jsStringArg(g.id);
+            const goodsType = escapeHtml(g.type);
+            const goodsChar = escapeHtml(g.char);
             const card = document.createElement('div');
             card.className = 'goods-card single-line';
             card.dataset.id = g.id; // 並べ替え用
@@ -267,8 +587,8 @@ function renderInventory() {
                 <div class="drag-handle" title="ドラッグして並び替え"></div>
                 <div class="goods-info">
                     <div class="goods-name">
-                        <span class="goods-type-label">${g.type}</span><br>
-                        <span style="color: var(--accent-gold); font-size: 1rem;">${g.char}</span>
+                        <span class="goods-type-label">${goodsType}</span><br>
+                        <span style="color: var(--accent-gold); font-size: 1rem;">${goodsChar}</span>
                     </div>
                 </div>
                 <div class="goods-controls-wrap">
@@ -278,14 +598,14 @@ function renderInventory() {
                     </div>
                     <div class="count-item actual-control">
                         <span class="count-label">実数</span>
-                        <button class="count-btn" onclick="updateCount('${g.id}', -1); event.stopPropagation();">-</button>
+                        <button class="count-btn" onclick="updateCount(${goodsIdArg}, -1); event.stopPropagation();">-</button>
                         <span class="count-num">${g.count}</span>
-                        <button class="count-btn" onclick="updateCount('${g.id}', 1); event.stopPropagation();">+</button>
+                        <button class="count-btn" onclick="updateCount(${goodsIdArg}, 1); event.stopPropagation();">+</button>
                     </div>
                     <div class="card-menu">
-                        <button class="nav-btn mini trade-check-btn" onclick="showGoodsDetail('${g.id}'); event.stopPropagation();">取引確認</button>
-                        <button class="nav-btn mini" onclick="editGoods('${g.id}'); event.stopPropagation();">編集</button>
-                        <button class="nav-btn mini cancel-btn" onclick="deleteGoods('${g.id}'); event.stopPropagation();">削除</button>
+                        <button class="nav-btn mini trade-check-btn" onclick="showGoodsDetail(${goodsIdArg}); event.stopPropagation();">取引確認</button>
+                        <button class="nav-btn mini" onclick="editGoods(${goodsIdArg}); event.stopPropagation();">編集</button>
+                        <button class="nav-btn mini cancel-btn" onclick="deleteGoods(${goodsIdArg}); event.stopPropagation();">削除</button>
                     </div>
                 </div>
             `;
@@ -302,7 +622,7 @@ async function updateCount(id, delta) {
     const g = goodsData.find(x => String(x.id) === String(id));
     if (!g) return;
     const newCount = Math.max(0, g.count + delta);
-    await sb.from('goods').update({ count: newCount }).eq('id', id);
+    await sb.from('goods').update({ count: newCount }).eq('id', id).eq('user_id', currentUser.id);
     
     // ローカルも更新しておくと再計算が正確になる
     g.count = newCount;
@@ -316,7 +636,7 @@ window.removeGoodsImage = () => {
     $('goods-img-input').value = '';
     $('goods-img-preview').src = '';
     hide('goods-img-preview-container');
-    $('goods-img-preview').dataset.url = ''; 
+    $('goods-img-preview').dataset.value = '';
 };
 
 $('goods-img-input').onchange = (e) => {
@@ -324,7 +644,7 @@ $('goods-img-input').onchange = (e) => {
     if (file) {
         const url = URL.createObjectURL(file);
         $('goods-img-preview').src = url;
-        $('goods-img-preview').dataset.url = ''; 
+        $('goods-img-preview').dataset.value = '';
         show('goods-img-preview-container');
     }
 };
@@ -340,23 +660,18 @@ $('goods-form').onsubmit = async (e) => {
     e.preventDefault();
     const id = $('goods-id-edit').value;
     const count = parseInt($('goods-count').value);
+    const oldGoods = id ? goodsData.find(g => String(g.id) === String(id)) : null;
     
-    let imageUrl = $('goods-img-preview').dataset.url || null;
+    let imageValue = $('goods-img-preview').dataset.value || null;
     if ($('goods-img-preview-container').classList.contains('hidden')) {
-        imageUrl = null;
+        imageValue = null;
     }
 
     const file = $('goods-img-input').files[0];
     if (file) {
-        // ファイル名の拡張子を取得
-        const ext = file.name.split('.').pop();
-        // 日本語や記号を避けるため、一意なIDで保存
-        const path = `${currentUser.id}/inv_${Date.now()}.${ext}`;
-        
-        const { data: uploadData, error: uploadError } = await sb.storage.from('mailing-images').upload(path, file);
-        if (!uploadError) {
-            imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl;
-        } else {
+        try {
+            imageValue = await uploadPrivateImage(file, 'inv');
+        } catch (uploadError) {
             console.error("画像アップロード詳細エラー:", uploadError);
             alert("画像アップロードに失敗しました\nエラー詳細：" + (uploadError.message || JSON.stringify(uploadError)));
             return; // 処理を中断
@@ -369,10 +684,10 @@ $('goods-form').onsubmit = async (e) => {
         char: $('goods-char').value, 
         count: count, 
         planned_count: count,
-        image_url: imageUrl
+        image_url: imageValue
     };
     const res = id 
-        ? await sb.from('goods').update(data).eq('id', id)
+        ? await sb.from('goods').update(data).eq('id', id).eq('user_id', currentUser.id)
         : await sb.from('goods').insert([data]);
 
     if (res.error) {
@@ -386,7 +701,11 @@ $('goods-form').onsubmit = async (e) => {
         await recalculatePlannedCount(id);
     }
 
-    console.log("保存された画像URL:", imageUrl);
+    if (oldGoods?.image_url && getStoredImageValue(oldGoods.image_url) !== imageValue) {
+        await removeStoredImage(oldGoods.image_url);
+    }
+
+    console.log("保存された画像パス:", imageValue);
     hide('goods-modal'); 
     
     // DB反映ラグ対策として少し待ってから再取得
@@ -402,8 +721,8 @@ window.editGoods = (id) => {
     $('goods-count').value = g.count;
     
     if (g.image_url) {
-        $('goods-img-preview').src = g.image_url;
-        $('goods-img-preview').dataset.url = g.image_url;
+        $('goods-img-preview').src = g.image_display_url || '';
+        $('goods-img-preview').dataset.value = getStoredImageValue(g.image_url);
         show('goods-img-preview-container');
     } else {
         removeGoodsImage();
@@ -411,11 +730,24 @@ window.editGoods = (id) => {
     show('goods-modal');
 };
 
-window.deleteGoods = async (id) => { if (confirm('削除しますか？')) { await sb.from('goods').delete().eq('id', id); fetchData(); } };
+window.deleteGoods = async (id) => {
+    if (!confirm('削除しますか？')) return;
+
+    const g = goodsData.find(x => String(x.id) === String(id));
+    const { error } = await sb.from('goods').delete().eq('id', id).eq('user_id', currentUser.id);
+    if (error) {
+        alert("削除に失敗しました\nエラー詳細：" + error.message);
+        return;
+    }
+    await removeStoredImage(g?.image_url);
+    fetchData();
+};
 
 // --- 取引管理 ---
 function updateTradeItemSelects() {
-    const options = goodsData.map(g => `<option value="${g.id}">[${g.type}] ${g.char}</option>`).join('');
+    const options = goodsData
+        .map(g => `<option value="${escapeAttr(g.id)}">[${escapeHtml(g.type)}] ${escapeHtml(g.char)}</option>`)
+        .join('');
     ['give-items-list', 'receive-items-list'].forEach(cid => {
         $(cid).innerHTML = '';
         for (let i = 0; i < 5; i++) {
@@ -446,7 +778,7 @@ window.removeTradeImage = () => {
     $('trade-img-preview').src = '';
     hide('trade-img-preview-container');
     // 編集中の場合はURLをクリアしたことを記憶させるためのフラグとしても使える
-    $('trade-img-preview').dataset.url = ''; 
+    $('trade-img-preview').dataset.value = '';
 };
 
 $('trade-address-img').onchange = (e) => {
@@ -454,7 +786,7 @@ $('trade-address-img').onchange = (e) => {
     if (file) {
         const url = URL.createObjectURL(file);
         $('trade-img-preview').src = url;
-        $('trade-img-preview').dataset.url = ''; // 新規アップロード時は既存URLをクリア
+        $('trade-img-preview').dataset.value = ''; // 新規アップロード時は既存値をクリア
         show('trade-img-preview-container');
     }
 };
@@ -462,7 +794,7 @@ $('trade-address-img').onchange = (e) => {
 $('add-trade-btn').onclick = () => {
     $('trade-form').reset(); $('trade-id').value = ''; 
     $('trade-status').value = '成約'; 
-    $('trade-img-preview').src = ''; $('trade-img-preview').dataset.url = '';
+    $('trade-img-preview').src = ''; $('trade-img-preview').dataset.value = '';
     hide('trade-img-preview-container');
     updateTradeItemSelects(); 
     toggleModalCheckboxes('成約');
@@ -497,22 +829,19 @@ $('trade-form').onsubmit = async (e) => {
     const oldTrade = id ? tradesData.find(t => t.id === id) : null;
     
     // image_urlの決定ロジック
-    // 1. プレビューにdataset.urlがあればそれを使う（変更なし）
+    // 1. プレビューにdataset.valueがあればそれを使う（変更なし）
     // 2. プレビューが非表示ならnull（削除済み）
     // 3. ファイルがあればアップロードして上書き
-    let imageUrl = $('trade-img-preview').dataset.url || null;
+    let imageValue = $('trade-img-preview').dataset.value || null;
     if ($('trade-img-preview-container').classList.contains('hidden')) {
-        imageUrl = null;
+        imageValue = null;
     }
 
     const file = $('trade-address-img').files[0];
     if (file) {
-        const ext = file.name.split('.').pop();
-        const path = `${currentUser.id}/trd_${Date.now()}.${ext}`;
-        const { data: uploadData, error: uploadError } = await sb.storage.from('mailing-images').upload(path, file);
-        if (!uploadError) {
-            imageUrl = sb.storage.from('mailing-images').getPublicUrl(path).data.publicUrl;
-        } else {
+        try {
+            imageValue = await uploadPrivateImage(file, 'trd');
+        } catch (uploadError) {
             console.error("画像アップロード詳細エラー:", uploadError);
             alert("画像アップロードに失敗しました\nエラー詳細：" + (uploadError.message || JSON.stringify(uploadError)));
             return; // 処理を中断
@@ -526,7 +855,7 @@ $('trade-form').onsubmit = async (e) => {
         user_id: currentUser.id, name: $('trade-name').value, type: $('trade-type').value, status: newStatus,
         memo: $('trade-memo').value, give_items: giveItems, receive_items: receiveItems,
         give_price: parseInt($('trade-give-price').value), receive_price: parseInt($('trade-receive-price').value),
-        image_url: imageUrl,
+        image_url: imageValue,
         // 成約していない場合は強制的にfalseにする（安全のため）
         is_packed: isActuallyContracted ? $('trade-is-packed').checked : false,
         is_sent: isActuallyContracted ? $('trade-is-sent').checked : false, 
@@ -538,7 +867,7 @@ $('trade-form').onsubmit = async (e) => {
 
     console.log("Saving trade data (Ensuring ID with select)...");
     const { data: savedData, error: dbError } = await (id 
-        ? sb.from('trades').update(newTradeData).eq('id', id).select()
+        ? sb.from('trades').update(newTradeData).eq('id', id).eq('user_id', currentUser.id).select()
         : sb.from('trades').insert([newTradeData]).select());
 
     if (dbError || !savedData?.[0]) {
@@ -549,6 +878,10 @@ $('trade-form').onsubmit = async (e) => {
 
     const savedTrade = savedData[0];
     console.log("Trade saved! ID:", savedTrade.id);
+
+    if (oldTrade?.image_url && getStoredImageValue(oldTrade.image_url) !== imageValue) {
+        await removeStoredImage(oldTrade.image_url);
+    }
 
     // 1. ローカルの tradesData を更新
     const tidx = tradesData.findIndex(x => x.id == savedTrade.id);
@@ -567,7 +900,12 @@ $('trade-form').onsubmit = async (e) => {
 async function recalculatePlannedCount(itemId) {
     const sid = String(itemId);
     // 最新の実数をDBから取得
-    const { data: g, error: gError } = await sb.from('goods').select('count').eq('id', sid).single();
+    const { data: g, error: gError } = await sb
+        .from('goods')
+        .select('count')
+        .eq('id', sid)
+        .eq('user_id', currentUser.id)
+        .single();
     if (gError || !g) {
         console.warn(`Item ${sid} not found for recalculation. Error:`, gError);
         return;
@@ -597,7 +935,7 @@ async function recalculatePlannedCount(itemId) {
     console.log(`[Result] Item:${sid} -> Actual:${g.count} + PendingDiff:${pendingDiff} = Planned:${newPlanned}`);
     
     // DB更新
-    await sb.from('goods').update({ planned_count: newPlanned }).eq('id', sid);
+    await sb.from('goods').update({ planned_count: newPlanned }).eq('id', sid).eq('user_id', currentUser.id);
     
     // ローカル変数の即時反映 (fetchを待たずにUI更新)
     const localGood = goodsData.find(x => String(x.id) === sid);
@@ -624,7 +962,7 @@ async function syncStock(oldT, newT) {
         const newCount = Math.max(0, g.count + delta);
         console.log(`[UpdateActual] Item:${sid} count: ${g.count} -> ${newCount}`);
         
-        const { error } = await sb.from('goods').update({ count: newCount }).eq('id', sid);
+        const { error } = await sb.from('goods').update({ count: newCount }).eq('id', sid).eq('user_id', currentUser.id);
         if (error) {
             console.error(`UpdateActual error for item ${sid}:`, error);
             throw new Error(`実数の更新に失敗しました: ${error.message}`);
@@ -695,8 +1033,8 @@ function renderTrades() {
             return true;
         })
         .filter(t => {
-            const nameMatch = (t.name || "").toLowerCase().includes(q);
-            const memoMatch = (t.memo || "").toLowerCase().includes(mq);
+            const nameMatch = String(t.name || "").toLowerCase().includes(q);
+            const memoMatch = String(t.memo || "").toLowerCase().includes(mq);
             return nameMatch && memoMatch;
         });
 
@@ -722,6 +1060,15 @@ function renderTrades() {
 
     filteredTrades.forEach(t => {
             const tradeNo = tradeNumberMap.get(t.id);
+            const tradeImageSrc = escapeAttr(t.image_display_url || '');
+            const tradeIdArg = jsStringArg(t.id);
+            const tradeName = escapeHtml(t.name);
+            const tradeMemo = escapeHtml(t.memo);
+            const shipDate = escapeAttr(t.est_ship_date || '');
+            const receiveDate = escapeAttr(t.est_receive_date || '');
+            const statusOptions = ['成約','仮約束','お声掛け中']
+                .map(s => `<option value="${escapeAttr(s)}" ${t.status===s?'selected':''}>${escapeHtml(s)}</option>`)
+                .join('');
             const card = document.createElement('div'); card.className = 'trade-card';
             
             const formatItem = i => {
@@ -729,9 +1076,9 @@ function renderTrades() {
                 const g = goodsData.find(gx => String(gx.id) === sid);
                 if (!g) {
                     console.warn(`Trade item ID ${sid} not found in goodsData.`);
-                    return `<span class="trade-item-line">? (ID:${sid}) ×${i.count}</span>`;
+                    return `<span class="trade-item-line">? (ID:${escapeHtml(sid)}) ×${escapeHtml(i.count)}</span>`;
                 }
-                return `<span class="trade-item-line"><span class="t-item-content"><span class="t-type">${g.type}</span> / <span class="t-char">${g.char}</span> <span class="t-count">×${i.count}</span></span></span>`;
+                return `<span class="trade-item-line"><span class="t-item-content"><span class="t-type">${escapeHtml(g.type)}</span> / <span class="t-char">${escapeHtml(g.char)}</span> <span class="t-count">×${escapeHtml(i.count)}</span></span></span>`;
             };
             const giveHtml = (t.give_items || []).map(formatItem).join('');
             const receiveHtml = (t.receive_items || []).map(formatItem).join('');
@@ -742,22 +1089,22 @@ function renderTrades() {
                 <div class="trade-card-grid">
                     <div class="tg-name">
                         <span class="trade-number-badge">#${tradeNo}</span>
-                        <span class="trade-user">${t.name}</span>
+                        <span class="trade-user">${tradeName}</span>
                     </div>
                     <div class="tg-actions">
                         <div class="t-action-btns">
-                            <button class="nav-btn mini" onclick="editTrade('${t.id}')">編集</button>
-                            <button class="nav-btn mini cancel-btn" onclick="deleteTrade('${t.id}')">削除</button>
+                            <button class="nav-btn mini" onclick="editTrade(${tradeIdArg})">編集</button>
+                            <button class="nav-btn mini cancel-btn" onclick="deleteTrade(${tradeIdArg})">削除</button>
                         </div>
                     </div>
                     <div class="tg-status">
-                        <select class="status-quick-change" onchange="quickStatusChange('${t.id}', this.value)">
-                            ${['成約','仮約束','お声掛け中'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
+                        <select class="status-quick-change" onchange="quickStatusChange(${tradeIdArg}, this.value)">
+                            ${statusOptions}
                         </select>
                     </div>
-                    ${t.image_url ? `
+                    ${tradeImageSrc ? `
                     <div class="tg-image">
-                        <img src="${t.image_url}" class="trade-main-img" onclick="showOverlay('${t.image_url}')">
+                        <img src="${tradeImageSrc}" class="trade-main-img" onclick="showTradeImage(${tradeIdArg})">
                     </div>` : ''}
                     <div class="tg-body">
                         <div class="trade-items-area">
@@ -776,21 +1123,21 @@ function renderTrades() {
                             <div class="trade-dates-desktop">
                                 <div class="date-check-pair">
                                     <label class="tag-inline ${t.is_packed?'done':''} ${!isTradeContracted?'disabled':''}">
-                                        <input type="checkbox" ${t.is_packed?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_packed', this.checked)"> 梱包済
+                                        <input type="checkbox" ${t.is_packed?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck(${tradeIdArg}, 'is_packed', this.checked)"> 梱包済
                                     </label>
                                 </div>
                                 <div class="date-check-pair">
                                     <span class="d-label">発送予定:</span>
-                                    <input type="date" value="${t.est_ship_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_ship_date', this.value)">
+                                    <input type="date" value="${shipDate}" class="trade-date-input" onchange="quickDateChange(${tradeIdArg}, 'est_ship_date', this.value)">
                                     <label class="tag-inline ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
-                                        <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済
+                                        <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck(${tradeIdArg}, 'is_sent', this.checked)"> 発送済
                                     </label>
                                 </div>
                                 <div class="date-check-pair">
                                     <span class="d-label">受取予定:</span>
-                                    <input type="date" value="${t.est_receive_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_receive_date', this.value)">
+                                    <input type="date" value="${receiveDate}" class="trade-date-input" onchange="quickDateChange(${tradeIdArg}, 'est_receive_date', this.value)">
                                     <label class="tag-inline ${t.is_received?'done':''} ${!isTradeContracted?'disabled':''}">
-                                        <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済
+                                        <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck(${tradeIdArg}, 'is_received', this.checked)"> 受取済
                                     </label>
                                 </div>
                             </div>
@@ -800,30 +1147,30 @@ function renderTrades() {
                         <div class="trade-footer-grid mobile-only">
                             <div class="date-check-row">
                                 <label class="tag-check ${t.is_packed?'done':''} ${!isTradeContracted?'disabled':''}">
-                                    <input type="checkbox" ${t.is_packed?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_packed', this.checked)"> 梱包済
+                                    <input type="checkbox" ${t.is_packed?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck(${tradeIdArg}, 'is_packed', this.checked)"> 梱包済
                                 </label>
                             </div>
                             <div class="date-check-row">
                                 <div class="date-input-wrap">
                                     <span class="d-label">発送予定:</span>
-                                    <input type="date" value="${t.est_ship_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_ship_date', this.value)">
+                                    <input type="date" value="${shipDate}" class="trade-date-input" onchange="quickDateChange(${tradeIdArg}, 'est_ship_date', this.value)">
                                 </div>
                                 <label class="tag-check ${t.is_sent?'done':''} ${!isTradeContracted?'disabled':''}">
-                                    <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_sent', this.checked)"> 発送済
+                                    <input type="checkbox" ${t.is_sent?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck(${tradeIdArg}, 'is_sent', this.checked)"> 発送済
                                 </label>
                             </div>
                             <div class="date-check-row">
                                 <div class="date-input-wrap">
                                     <span class="d-label">受取予定:</span>
-                                    <input type="date" value="${t.est_receive_date || ''}" class="trade-date-input" onchange="quickDateChange('${t.id}', 'est_receive_date', this.value)">
+                                    <input type="date" value="${receiveDate}" class="trade-date-input" onchange="quickDateChange(${tradeIdArg}, 'est_receive_date', this.value)">
                                 </div>
                                 <label class="tag-check ${t.is_received?'done':''} ${!isTradeContracted?'disabled':''}">
-                                    <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck('${t.id}', 'is_received', this.checked)"> 受取済
+                                    <input type="checkbox" ${t.is_received?'checked':''} ${!isTradeContracted?'disabled':''} onchange="quickCheck(${tradeIdArg}, 'is_received', this.checked)"> 受取済
                                 </label>
                             </div>
                         </div>
 
-                        ${t.memo ? `<div class="trade-memo-box"><span class="memo-label">メモ：</span>${t.memo}</div>` : ''}
+                        ${t.memo ? `<div class="trade-memo-box"><span class="memo-label">メモ：</span>${tradeMemo}</div>` : ''}
                     </div>
                 </div>
             `;
@@ -840,7 +1187,7 @@ window.quickStatusChange = async (id, newS) => {
     // DB更新を先行し、結果を確実に受け取る (select()を使用)
     const { data: saved, error } = await sb.from('trades').update({ 
         status: newS, is_packed: newT.is_packed ?? t.is_packed ?? false, is_sent: newT.is_sent, is_received: newT.is_received 
-    }).eq('id', id).select();
+    }).eq('id', id).eq('user_id', currentUser.id).select();
     
     if (error || !saved?.[0]) {
         console.error("Quick status update error:", error);
@@ -862,7 +1209,7 @@ window.quickCheck = async (id, field, value) => {
     const newT = JSON.parse(JSON.stringify(t)); newT[field] = value;
 
     // DB更新を先行し、結果を確実に受け取る
-    const { data: saved, error } = await sb.from('trades').update({ [field]: value }).eq('id', id).select();
+    const { data: saved, error } = await sb.from('trades').update({ [field]: value }).eq('id', id).eq('user_id', currentUser.id).select();
     
     if (error || !saved?.[0]) {
         console.error("Quick check update error:", error);
@@ -878,7 +1225,7 @@ window.quickCheck = async (id, field, value) => {
 };
 
 window.quickDateChange = async (id, field, value) => {
-    await sb.from('trades').update({ [field]: value }).eq('id', id);
+    await sb.from('trades').update({ [field]: value }).eq('id', id).eq('user_id', currentUser.id);
     const t = tradesData.find(x => x.id === id);
     if (t) t[field] = value;
 };
@@ -914,12 +1261,12 @@ window.editTrade = (id) => {
 
     // 画像の流し込み
     if (t.image_url) {
-        $('trade-img-preview').src = t.image_url;
-        $('trade-img-preview').dataset.url = t.image_url;
+        $('trade-img-preview').src = t.image_display_url || '';
+        $('trade-img-preview').dataset.value = getStoredImageValue(t.image_url);
         show('trade-img-preview-container');
     } else {
         $('trade-img-preview').src = '';
-        $('trade-img-preview').dataset.url = '';
+        $('trade-img-preview').dataset.value = '';
         hide('trade-img-preview-container');
     }
     show('trade-modal');
@@ -937,7 +1284,12 @@ window.deleteTrade = async (id) => {
         undoT.is_received = false;
         await syncStock(t, undoT);
     }
-    await sb.from('trades').delete().eq('id', id);
+    const { error } = await sb.from('trades').delete().eq('id', id).eq('user_id', currentUser.id);
+    if (error) {
+        alert("取引の削除に失敗しました\nエラー詳細：" + error.message);
+        return;
+    }
+    await removeStoredImage(t?.image_url);
     fetchData();
 };
 
@@ -975,10 +1327,10 @@ window.showGoodsDetail = (goodsId) => {
             return `
                 <div class="gd-trade-row">
                     <span class="trade-number-badge">#${tradeNo}</span>
-                    <span class="gd-trade-name">${t.name || '（名前なし）'}</span>
-                    <span class="gd-trade-count">×${item.count}</span>
+                    <span class="gd-trade-name">${escapeHtml(t.name || '（名前なし）')}</span>
+                    <span class="gd-trade-count">×${escapeHtml(item.count)}</span>
                     <span class="gd-badge ${dirClass}">${dirLabel}</span>
-                    <span class="gd-status-chip">${t.status}</span>
+                    <span class="gd-status-chip">${escapeHtml(t.status)}</span>
                 </div>`;
         };
 
@@ -1015,7 +1367,7 @@ function switchSection(section) {
         hide('inventory-section'); show('trades-section');
         $('nav-inventory').classList.remove('active'); $('nav-trades').classList.add('active');
     }
-    localStorage.setItem('twst_active_section', section);
+    localStorage.setItem(STORAGE_KEYS.activeSection, section);
 }
 
 $('nav-inventory').onclick = () => switchSection('inventory');
@@ -1026,17 +1378,20 @@ function handleAuthStateChange(session) {
     if (isRecovering) return;
     if (session) {
         currentUser = session.user;
-        $('user-info').textContent = `Logged in as: ${currentUser.email}`;
-        hide('auth-section'); show('main-app');
+        $('user-info').textContent = `ログイン中: ${currentUser.email}`;
+        hide('auth-section');
+        hide('signup-section');
+        show('main-app');
         fetchData();
         checkAndMigrateLocalData();
         // 最後にいた画面を復元
-        const saved = localStorage.getItem('twst_active_section') || 'inventory';
+        const saved = readLocalSetting(STORAGE_KEYS.activeSection, STORAGE_KEYS.legacyActiveSection, 'inventory');
         switchSection(saved);
     } else {
         currentUser = null;
         $('user-info').textContent = '';
-        show('auth-section'); hide('main-app');
+        if ($('signup-section')?.classList.contains('hidden')) show('auth-section');
+        hide('main-app');
     }
 }
 document.querySelectorAll('.cancel-btn').forEach(b => {
@@ -1057,7 +1412,20 @@ document.querySelectorAll('.cancel-btn').forEach(b => {
         }
     };
 });
-window.showOverlay = (url) => { $('overlay-img').src = url; show('image-overlay'); };
+window.showOverlay = async (imageValue) => {
+    const url = await getImageDisplayUrl(imageValue);
+    if (!url) return;
+    $('overlay-img').src = url;
+    show('image-overlay');
+};
+window.showGoodsImage = (id) => {
+    const g = goodsData.find(x => String(x.id) === String(id));
+    if (g?.image_url) showOverlay(g.image_url);
+};
+window.showTradeImage = (id) => {
+    const t = tradesData.find(x => String(x.id) === String(id));
+    if (t?.image_url) showOverlay(t.image_url);
+};
 $('image-overlay').onclick = () => hide('image-overlay');
 $('goods-search').oninput = renderInventory;
 $('trade-search').oninput = renderTrades; // 追加
@@ -1079,7 +1447,7 @@ function initializeSortable() {
             const ids = Array.from(list.children).map(el => el.dataset.id);
             // 順番を一斉更新
             for (let i = 0; i < ids.length; i++) {
-                await sb.from('goods').update({ sort_order: i }).eq('id', ids[i]);
+                await sb.from('goods').update({ sort_order: i }).eq('id', ids[i]).eq('user_id', currentUser.id);
             }
             // ローカルのデータも一応更新
             ids.forEach((id, i) => {
@@ -1091,10 +1459,17 @@ function initializeSortable() {
 }
 
 async function checkAndMigrateLocalData() {
-    const local = JSON.parse(localStorage.getItem('twst_goods') || '[]');
+    let local = [];
+    try {
+        local = JSON.parse(readLocalSetting(STORAGE_KEYS.localGoods, STORAGE_KEYS.legacyLocalGoods, '[]'));
+    } catch (error) {
+        console.warn('Local data parse failed:', error);
+    }
     if (local.length > 0 && confirm('ローカルデータを同期しますか？')) {
         for (const g of local) { await sb.from('goods').insert([{ user_id: currentUser.id, type: g.type, char: g.char, count: g.count, planned_count: g.count }]); }
-        localStorage.removeItem('twst_goods'); fetchData();
+        localStorage.removeItem(STORAGE_KEYS.localGoods);
+        localStorage.removeItem(STORAGE_KEYS.legacyLocalGoods);
+        fetchData();
     }
 }
 // 初期化時にビューを設定
