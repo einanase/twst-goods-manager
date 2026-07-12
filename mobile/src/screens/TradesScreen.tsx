@@ -35,6 +35,15 @@ const flagLabels = {
   is_received: '受取',
 };
 
+type TradeFormStep = 'basic' | 'items' | 'progress' | 'notes';
+
+const tradeFormSteps: Array<{ key: TradeFormStep; label: string }> = [
+  { key: 'basic', label: '基本' },
+  { key: 'items', label: '品物' },
+  { key: 'progress', label: '進行' },
+  { key: 'notes', label: 'メモ' },
+];
+
 export function TradesScreen({ userId }: TradesScreenProps) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [goods, setGoods] = useState<GoodsItem[]>([]);
@@ -59,6 +68,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageName, setImageName] = useState<string | null>(null);
   const [storedImageValue, setStoredImageValue] = useState<string | null>(null);
+  const [tradeFormStep, setTradeFormStep] = useState<TradeFormStep>('basic');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -104,6 +114,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     setImageUri(null);
     setImageName(null);
     setStoredImageValue(null);
+    setTradeFormStep('basic');
     setModalVisible(true);
   }
 
@@ -123,6 +134,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     setImageUri(null);
     setImageName(null);
     setStoredImageValue(getStoredImageValue(trade.image_url));
+    setTradeFormStep('basic');
     setModalVisible(true);
   }
 
@@ -357,6 +369,21 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     ]);
   }
 
+  const tradeFormStepIndex = Math.max(
+    0,
+    tradeFormSteps.findIndex((step) => step.key === tradeFormStep),
+  );
+  const isFirstTradeFormStep = tradeFormStepIndex === 0;
+  const isLastTradeFormStep = tradeFormStepIndex === tradeFormSteps.length - 1;
+
+  function moveTradeFormStep(direction: -1 | 1) {
+    const nextIndex = Math.min(tradeFormSteps.length - 1, Math.max(0, tradeFormStepIndex + direction));
+    const nextStep = tradeFormSteps[nextIndex];
+    if (nextStep) {
+      setTradeFormStep(nextStep.key);
+    }
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.toolbar}>
@@ -455,91 +482,137 @@ export function TradesScreen({ userId }: TradesScreenProps) {
         <ScrollView contentContainerStyle={styles.modalContent}>
           <Text style={styles.modalTitle}>{editingTrade ? '取引を編集' : '取引を追加'}</Text>
 
-          <TextField label="相手のX ID / 名前" value={name} onChangeText={setName} placeholder="@username" />
-          <Segmented label="取引内容" options={tradeTypes} value={type} onChange={setType} />
-          <Segmented label="ステータス" options={statuses} value={status} onChange={confirmModalStatusChange} />
-
-          <View style={styles.checkPanel}>
-            <ToggleRow
-              label="梱包済"
-              value={isPacked}
-              onValueChange={(nextValue) =>
-                confirmModalFlagChange('is_packed', isPacked, nextValue, setIsPacked)
-              }
-              disabled={status !== '成約'}
-            />
-            <ToggleRow
-              label="発送済"
-              value={isSent}
-              onValueChange={(nextValue) =>
-                confirmModalFlagChange('is_sent', isSent, nextValue, setIsSent)
-              }
-              disabled={status !== '成約'}
-            />
-            <ToggleRow
-              label="受取済"
-              value={isReceived}
-              onValueChange={(nextValue) =>
-                confirmModalFlagChange('is_received', isReceived, nextValue, setIsReceived)
-              }
-              disabled={status !== '成約'}
-            />
+          <View style={styles.formStepTabs}>
+            {tradeFormSteps.map((step) => {
+              const active = step.key === tradeFormStep;
+              return (
+                <Pressable
+                  key={step.key}
+                  accessibilityRole="button"
+                  onPress={() => setTradeFormStep(step.key)}
+                  style={[styles.formStepTab, active ? styles.formStepTabActive : null]}
+                >
+                  <Text style={[styles.formStepTabText, active ? styles.formStepTabTextActive : null]}>
+                    {step.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
-          <TextField
-            label="発送予定日"
-            value={shipDate}
-            onChangeText={setShipDate}
-            placeholder="YYYY-MM-DD"
-            keyboardType="numbers-and-punctuation"
-          />
-          <TextField
-            label="受取予定日"
-            value={receiveDate}
-            onChangeText={setReceiveDate}
-            placeholder="YYYY-MM-DD"
-            keyboardType="numbers-and-punctuation"
-          />
+          <View style={styles.formStepBody}>
+            {tradeFormStep === 'basic' ? (
+              <>
+                <TextField label="相手のX ID / 名前" value={name} onChangeText={setName} placeholder="@username" />
+                <Segmented label="取引内容" options={tradeTypes} value={type} onChange={setType} />
+                <Segmented label="ステータス" options={statuses} value={status} onChange={confirmModalStatusChange} />
+              </>
+            ) : null}
 
-          <TradeItemEditor title="渡すもの" goods={goods} items={giveItems} onChange={setGiveItems} />
-          <TradeItemEditor title="受けるもの" goods={goods} items={receiveItems} onChange={setReceiveItems} />
+            {tradeFormStep === 'items' ? (
+              <>
+                <TradeItemEditor title="渡すもの" goods={goods} items={giveItems} onChange={setGiveItems} />
+                <TradeItemEditor title="受けるもの" goods={goods} items={receiveItems} onChange={setReceiveItems} />
+              </>
+            ) : null}
 
-          <TextField
-            label="取引メモ"
-            value={memo}
-            onChangeText={setMemo}
-            placeholder="発送方法や約束事など"
-            multiline
-            style={styles.memoInput}
-          />
+            {tradeFormStep === 'progress' ? (
+              <>
+                <View style={styles.checkPanel}>
+                  <ToggleRow
+                    label="梱包済"
+                    value={isPacked}
+                    onValueChange={(nextValue) =>
+                      confirmModalFlagChange('is_packed', isPacked, nextValue, setIsPacked)
+                    }
+                    disabled={status !== '成約'}
+                  />
+                  <ToggleRow
+                    label="発送済"
+                    value={isSent}
+                    onValueChange={(nextValue) =>
+                      confirmModalFlagChange('is_sent', isSent, nextValue, setIsSent)
+                    }
+                    disabled={status !== '成約'}
+                  />
+                  <ToggleRow
+                    label="受取済"
+                    value={isReceived}
+                    onValueChange={(nextValue) =>
+                      confirmModalFlagChange('is_received', isReceived, nextValue, setIsReceived)
+                    }
+                    disabled={status !== '成約'}
+                  />
+                </View>
 
-          <View style={styles.imageEditBox}>
-            <Text style={styles.sectionLabel}>取引画像</Text>
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.previewImage} />
-            ) : editingTrade?.image_display_url && storedImageValue ? (
-              <Image source={{ uri: editingTrade.image_display_url }} style={styles.previewImage} />
-            ) : (
-              <View style={styles.previewPlaceholder}>
-                <Text style={styles.placeholderText}>画像なし</Text>
-              </View>
-            )}
-            <View style={styles.rowActions}>
-              <AppButton label="画像を選ぶ" variant="secondary" onPress={pickImage} />
-              <AppButton
-                label="画像を外す"
-                variant="ghost"
-                onPress={() => {
-                  setImageUri(null);
-                  setImageName(null);
-                  setStoredImageValue(null);
-                }}
-              />
-            </View>
+                <TextField
+                  label="発送予定日"
+                  value={shipDate}
+                  onChangeText={setShipDate}
+                  placeholder="YYYY-MM-DD"
+                  keyboardType="numbers-and-punctuation"
+                />
+                <TextField
+                  label="受取予定日"
+                  value={receiveDate}
+                  onChangeText={setReceiveDate}
+                  placeholder="YYYY-MM-DD"
+                  keyboardType="numbers-and-punctuation"
+                />
+              </>
+            ) : null}
+
+            {tradeFormStep === 'notes' ? (
+              <>
+                <TextField
+                  label="取引メモ"
+                  value={memo}
+                  onChangeText={setMemo}
+                  placeholder="発送方法や約束事など"
+                  multiline
+                  style={styles.memoInput}
+                />
+
+                <View style={styles.imageEditBox}>
+                  <Text style={styles.sectionLabel}>取引画像</Text>
+                  {imageUri ? (
+                    <Image source={{ uri: imageUri }} style={styles.previewImage} />
+                  ) : editingTrade?.image_display_url && storedImageValue ? (
+                    <Image source={{ uri: editingTrade.image_display_url }} style={styles.previewImage} />
+                  ) : (
+                    <View style={styles.previewPlaceholder}>
+                      <Text style={styles.placeholderText}>画像なし</Text>
+                    </View>
+                  )}
+                  <View style={styles.rowActions}>
+                    <AppButton label="画像を選ぶ" variant="secondary" onPress={pickImage} />
+                    <AppButton
+                      label="画像を外す"
+                      variant="ghost"
+                      onPress={() => {
+                        setImageUri(null);
+                        setImageName(null);
+                        setStoredImageValue(null);
+                      }}
+                    />
+                  </View>
+                </View>
+              </>
+            ) : null}
           </View>
 
           <View style={styles.modalActions}>
-            <AppButton label="キャンセル" variant="ghost" disabled={saving} onPress={() => setModalVisible(false)} />
+            <View style={styles.modalNavActions}>
+              <AppButton label="キャンセル" variant="ghost" disabled={saving} onPress={() => setModalVisible(false)} />
+              <View style={styles.modalStepActions}>
+                {!isFirstTradeFormStep ? (
+                  <AppButton label="前へ" variant="ghost" disabled={saving} onPress={() => moveTradeFormStep(-1)} />
+                ) : null}
+                {!isLastTradeFormStep ? (
+                  <AppButton label="次へ" variant="secondary" disabled={saving} onPress={() => moveTradeFormStep(1)} />
+                ) : null}
+              </View>
+            </View>
             <AppButton label={saving ? '保存中...' : '保存する'} disabled={saving} onPress={saveTrade} />
           </View>
         </ScrollView>
@@ -958,6 +1031,35 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '900',
   },
+  formStepTabs: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+  },
+  formStepTab: {
+    alignItems: 'center',
+    borderRadius: 8,
+    flex: 1,
+    minHeight: 38,
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  formStepTabActive: {
+    backgroundColor: colors.primary,
+  },
+  formStepTabText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  formStepTabTextActive: {
+    color: colors.primaryText,
+  },
+  formStepBody: {
+    gap: 16,
+  },
   segmentedWrap: {
     gap: 8,
   },
@@ -1076,11 +1178,20 @@ const styles = StyleSheet.create({
   },
   rowActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   modalActions: {
+    gap: 10,
+  },
+  modalNavActions: {
+    alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  modalStepActions: {
+    flexDirection: 'row',
+    gap: 8,
   },
 });
