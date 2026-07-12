@@ -29,6 +29,11 @@ type TradesScreenProps = {
 
 const tradeTypes: TradeType[] = ['交換', '譲渡', '交換+譲渡'];
 const statuses: TradeStatus[] = ['成約', '仮約束', 'お声掛け中'];
+const flagLabels = {
+  is_packed: '梱包',
+  is_sent: '発送',
+  is_received: '受取',
+};
 
 export function TradesScreen({ userId }: TradesScreenProps) {
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -202,6 +207,22 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   }
 
   async function updateStatus(trade: Trade, nextStatus: TradeStatus) {
+    if (trade.status === nextStatus) return;
+
+    Alert.alert(
+      'ステータスを変更しますか？',
+      `${trade.name} のステータスを「${trade.status}」から「${nextStatus}」へ変更します。`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '変更する',
+          onPress: () => applyStatusChange(trade, nextStatus),
+        },
+      ],
+    );
+  }
+
+  async function applyStatusChange(trade: Trade, nextStatus: TradeStatus) {
     const previous = trades;
     const previousGoods = goods;
     const patch = {
@@ -236,6 +257,25 @@ export function TradesScreen({ userId }: TradesScreenProps) {
       return;
     }
 
+    const action = value ? '済みにする' : '未完了に戻す';
+    Alert.alert(
+      `${flagLabels[field]}を変更しますか？`,
+      `${trade.name} の「${flagLabels[field]}」を${action}操作です。発送・受取は在庫数にも反映されます。`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '変更する',
+          onPress: () => applyTradeFlagChange(trade, field, value),
+        },
+      ],
+    );
+  }
+
+  async function applyTradeFlagChange(
+    trade: Trade,
+    field: 'is_packed' | 'is_sent' | 'is_received',
+    value: boolean,
+  ) {
     const previous = trades;
     const previousGoods = goods;
     const optimistic = { ...trade, [field]: value };
@@ -252,6 +292,47 @@ export function TradesScreen({ userId }: TradesScreenProps) {
       setGoods(previousGoods);
       showError('取引状態の更新に失敗しました', error);
     }
+  }
+
+  function confirmModalStatusChange(nextStatus: TradeStatus) {
+    if (status === nextStatus) return;
+
+    Alert.alert('ステータスを変更しますか？', `編集中の取引を「${status}」から「${nextStatus}」へ変更します。`, [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '変更する',
+        onPress: () => {
+          setStatus(nextStatus);
+          if (nextStatus !== '成約') {
+            setIsPacked(false);
+            setIsSent(false);
+            setIsReceived(false);
+          }
+        },
+      },
+    ]);
+  }
+
+  function confirmModalFlagChange(
+    field: 'is_packed' | 'is_sent' | 'is_received',
+    currentValue: boolean,
+    nextValue: boolean,
+    setter: (value: boolean) => void,
+  ) {
+    if (currentValue === nextValue) return;
+
+    const action = nextValue ? '済みにする' : '未完了に戻す';
+    Alert.alert(
+      `${flagLabels[field]}を変更しますか？`,
+      `編集中の取引の「${flagLabels[field]}」を${action}操作です。保存すると在庫計算に反映されます。`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '変更する',
+          onPress: () => setter(nextValue),
+        },
+      ],
+    );
   }
 
   async function confirmDelete(trade: Trade) {
@@ -376,12 +457,33 @@ export function TradesScreen({ userId }: TradesScreenProps) {
 
           <TextField label="相手のX ID / 名前" value={name} onChangeText={setName} placeholder="@username" />
           <Segmented label="取引内容" options={tradeTypes} value={type} onChange={setType} />
-          <Segmented label="ステータス" options={statuses} value={status} onChange={setStatus} />
+          <Segmented label="ステータス" options={statuses} value={status} onChange={confirmModalStatusChange} />
 
           <View style={styles.checkPanel}>
-            <ToggleRow label="梱包済" value={isPacked} onValueChange={setIsPacked} disabled={status !== '成約'} />
-            <ToggleRow label="発送済" value={isSent} onValueChange={setIsSent} disabled={status !== '成約'} />
-            <ToggleRow label="受取済" value={isReceived} onValueChange={setIsReceived} disabled={status !== '成約'} />
+            <ToggleRow
+              label="梱包済"
+              value={isPacked}
+              onValueChange={(nextValue) =>
+                confirmModalFlagChange('is_packed', isPacked, nextValue, setIsPacked)
+              }
+              disabled={status !== '成約'}
+            />
+            <ToggleRow
+              label="発送済"
+              value={isSent}
+              onValueChange={(nextValue) =>
+                confirmModalFlagChange('is_sent', isSent, nextValue, setIsSent)
+              }
+              disabled={status !== '成約'}
+            />
+            <ToggleRow
+              label="受取済"
+              value={isReceived}
+              onValueChange={(nextValue) =>
+                confirmModalFlagChange('is_received', isReceived, nextValue, setIsReceived)
+              }
+              disabled={status !== '成約'}
+            />
           </View>
 
           <TextField
