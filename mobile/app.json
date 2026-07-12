@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "グッズ交換管理",
+    "slug": "goods-trade-manager",
+    "scheme": "goodstrade",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.goodstrademanager"
+    },
+    "android": {
+      "package": "com.example.goodstrademanager"
+    },
+    "plugins": [
+      "expo-image-picker"
+    ]
+  }
+}

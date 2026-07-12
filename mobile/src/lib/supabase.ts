@@ -1,0 +1,41 @@
+import { AppState, Platform } from 'react-native';
+import 'react-native-url-polyfill/auto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createClient, processLock, type SupabaseClient } from '@supabase/supabase-js';
+import { env, hasSupabaseConfig } from './env';
+
+let client: SupabaseClient | null = null;
+let appStateListenerReady = false;
+
+export function getSupabase() {
+  if (!hasSupabaseConfig) {
+    throw new Error('Supabase settings are missing. Create mobile/.env from mobile/.env.example.');
+  }
+
+  if (!client) {
+    client = createClient(env.supabaseUrl, env.supabasePublishableKey, {
+      auth: {
+        ...(Platform.OS !== 'web' ? { storage: AsyncStorage } : {}),
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+        lock: processLock,
+      },
+    });
+  }
+
+  if (!appStateListenerReady && Platform.OS !== 'web') {
+    appStateListenerReady = true;
+    AppState.addEventListener('change', (state) => {
+      if (!client) return;
+      if (state === 'active') {
+        client.auth.startAutoRefresh();
+      } else {
+        client.auth.stopAutoRefresh();
+      }
+    });
+  }
+
+  return client;
+}
+

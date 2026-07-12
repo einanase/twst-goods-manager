@@ -1,0 +1,68 @@
+export type RowId = string | number;
+
+export type GoodsItem = {
+  id: RowId;
+  user_id: string;
+  type: string;
+  char: string;
+  count: number;
+  planned_count: number | null;
+  image_url: string | null;
+  image_display_url?: string;
+  sort_order: number | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type TradeStatus = '成約' | '仮約束' | 'お声掛け中' | 'キャンセル';
+export type TradeType = '交換' | '譲渡' | '交換+譲渡';
+
+export type TradeItem = {
+  id: RowId;
+  count: number;
+};
+
+export type Trade = {
+  id: RowId;
+  user_id: string;
+  name: string;
+  type: TradeType;
+  status: TradeStatus;
+  memo: string | null;
+  give_items: TradeItem[];
+  receive_items: TradeItem[];
+  image_url: string | null;
+  image_display_url?: string;
+  is_packed: boolean;
+  is_sent: boolean;
+  is_received: boolean;
+  est_ship_date: string | null;
+  est_receive_date: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type GoodsInput = {
+  type: string;
+  char: string;
+  count: number;
+  planned_count: number;
+  image_url: string | null;
+  sort_order?: number | null;
+};
+
+export type TradeInput = {
+  name: string;
+  type: TradeType;
+  status: TradeStatus;
+  memo: string | null;
+  give_items: TradeItem[];
+  receive_items: TradeItem[];
+  image_url: string | null;
+  is_packed: boolean;
+  is_sent: boolean;
+  is_received: boolean;
+  est_ship_date: string | null;
+  est_receive_date: string | null;
+};
+
