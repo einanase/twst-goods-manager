@@ -234,7 +234,7 @@ async function getImageDisplayUrl(imageValue) {
     const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, SIGNED_IMAGE_URL_TTL);
     if (error || !data?.signedUrl) {
         console.warn('署名付き画像URLの作成に失敗しました:', error);
-        return /^https?:\/\//i.test(raw) ? raw : '';
+        return '';
     }
 
     signedImageUrlCache.set(path, {
