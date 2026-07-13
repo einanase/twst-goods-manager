@@ -196,13 +196,21 @@ Authenticationの設定で以下を行います。
 
 ## 6. アプリ側の接続先を切り替える
 
-`mobile/.env.production.example` を参考に、本番用の値を設定します。
+接続先の切り替えルールは `ENVIRONMENTS.md` にまとめています。
+販売/審査用に起動・ビルドする時は、`mobile/.env.production.example` を参考に `.env.production` を作ります。
 
 ```powershell
-copy .env.production.example .env
+copy .env.production.example .env.production
 ```
 
-その後、販売用Supabaseの Project URL と publishable key に書き換えます。
+その後、`.env.production` を販売用Supabaseの Project URL と publishable key に書き換えます。
+販売/審査用で起動・ビルドする直前に、`.env.production` を `.env` にコピーします。
+
+```powershell
+copy .env.production .env
+```
+
+奥さま用Supabaseの値を販売/審査用 `.env.production` に入れないでください。
 
 ## 7. 販売前チェック
 
@@ -211,4 +219,3 @@ copy .env.production.example .env
 - `mailing-images` bucket の Public bucket が OFF であることを確認する
 - 新規登録メールがアプリ名で届くことを確認する
 - 画像アップロード後、別ユーザーからURLを推測しても見えないことを確認する
-

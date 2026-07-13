@@ -9,9 +9,9 @@ export function SetupScreen() {
       <View style={styles.panel}>
         <Text style={styles.title}>Supabase設定が未設定です</Text>
         <Text style={styles.body}>
-          mobile/.env.example を mobile/.env にコピーして、Supabase URL と publishable key を入れてください。
+          mobile/ENVIRONMENTS.md を見て、奥さま用または販売用の .env を作成してください。
         </Text>
-        <Text style={styles.code}>copy .env.example .env</Text>
+        <Text style={styles.code}>copy .env.wife .env</Text>
       </View>
     </SafeAreaView>
   );
@@ -52,4 +52,3 @@ const styles = StyleSheet.create({
     padding: 12,
   },
 });
-

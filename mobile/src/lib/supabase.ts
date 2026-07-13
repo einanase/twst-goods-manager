@@ -9,7 +9,7 @@ let appStateListenerReady = false;
 
 export function getSupabase() {
   if (!hasSupabaseConfig) {
-    throw new Error('Supabase settings are missing. Create mobile/.env from mobile/.env.example.');
+    throw new Error('Supabase settings are missing. Follow mobile/ENVIRONMENTS.md to create mobile/.env.');
   }
 
   if (!client) {
@@ -38,4 +38,3 @@ export function getSupabase() {
 
   return client;
 }
-

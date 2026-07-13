@@ -4,5 +4,7 @@ dist/
 web-build/
 .env
 .env.local
+.env.wife
+.env.production
+.env.staging
 .env.*.local
-
