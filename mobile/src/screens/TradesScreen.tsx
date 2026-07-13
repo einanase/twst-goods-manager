@@ -603,7 +603,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
 
           <View style={styles.modalActions}>
             <View style={styles.modalNavActions}>
-              <AppButton label="キャンセル" variant="ghost" disabled={saving} onPress={() => setModalVisible(false)} />
+              <AppButton label="キャンセル" variant="cancel" disabled={saving} onPress={() => setModalVisible(false)} />
               <View style={styles.modalStepActions}>
                 {!isFirstTradeFormStep ? (
                   <AppButton label="前へ" variant="ghost" disabled={saving} onPress={() => moveTradeFormStep(-1)} />
