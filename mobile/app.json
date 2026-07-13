@@ -14,7 +14,13 @@
       "package": "com.example.goodstrademanager"
     },
     "plugins": [
-      "expo-image-picker"
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "在庫画像や取引画像を追加するために写真へのアクセスを使用します。",
+          "cameraPermission": "在庫画像や取引画像を撮影するためにカメラを使用します。"
+        }
+      ]
     ]
   }
 }

@@ -15,6 +15,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { AppButton } from '../components/AppButton';
 import { EmptyState } from '../components/EmptyState';
+import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { QuantityStepper } from '../components/QuantityStepper';
 import { TextField } from '../components/TextField';
 import { colors } from '../lib/theme';
@@ -26,6 +27,11 @@ import type { GoodsItem, RowId, Trade, TradeInput, TradeItem, TradeStatus, Trade
 type TradesScreenProps = {
   userId: string;
 };
+
+type ImagePreview = {
+  uri: string;
+  title: string;
+} | null;
 
 const tradeTypes: TradeType[] = ['交換', '譲渡', '交換+譲渡'];
 const statuses: TradeStatus[] = ['成約', '仮約束', 'お声掛け中'];
@@ -69,6 +75,8 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   const [imageName, setImageName] = useState<string | null>(null);
   const [storedImageValue, setStoredImageValue] = useState<string | null>(null);
   const [tradeFormStep, setTradeFormStep] = useState<TradeFormStep>('basic');
+  const [previewImage, setPreviewImage] = useState<ImagePreview>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -151,9 +159,49 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     });
 
     if (!result.canceled) {
-      setImageUri(result.assets[0]?.uri ?? null);
-      setImageName(result.assets[0]?.fileName ?? null);
+      applyPickedImage(result.assets[0]);
     }
+  }
+
+  async function takePhoto() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('撮影できません', 'カメラへのアクセスを許可してください。');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      quality: 0.82,
+    });
+
+    if (!result.canceled) {
+      applyPickedImage(result.assets[0]);
+    }
+  }
+
+  function applyPickedImage(asset: ImagePicker.ImagePickerAsset | undefined) {
+    if (!asset?.uri) return;
+    setImageUri(asset.uri);
+    setImageName(asset.fileName ?? null);
+  }
+
+  function clearImage() {
+    setImageUri(null);
+    setImageName(null);
+    setStoredImageValue(null);
+  }
+
+  function confirmRemoveImage() {
+    if (!currentEditImageUri) return;
+    Alert.alert('画像を外しますか？', '保存するまで変更は確定しません。', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '外す',
+        style: 'destructive',
+        onPress: clearImage,
+      },
+    ]);
   }
 
   async function saveTrade() {
@@ -166,6 +214,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     try {
       let nextImageValue = storedImageValue;
       if (imageUri) {
+        setUploadingImage(true);
         nextImageValue = await uploadPrivateImageFromUri({
           userId,
           uri: imageUri,
@@ -214,6 +263,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     } catch (error) {
       showError('取引の保存に失敗しました', error);
     } finally {
+      setUploadingImage(false);
       setSaving(false);
     }
   }
@@ -375,6 +425,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   );
   const isFirstTradeFormStep = tradeFormStepIndex === 0;
   const isLastTradeFormStep = tradeFormStepIndex === tradeFormSteps.length - 1;
+  const currentEditImageUri = imageUri ?? (editingTrade?.image_display_url && storedImageValue ? editingTrade.image_display_url : null);
 
   function moveTradeFormStep(direction: -1 | 1) {
     const nextIndex = Math.min(tradeFormSteps.length - 1, Math.max(0, tradeFormStepIndex + direction));
@@ -443,7 +494,16 @@ export function TradesScreen({ userId }: TradesScreenProps) {
               </View>
 
               {item.image_display_url ? (
-                <Image source={{ uri: item.image_display_url }} style={styles.tradeImage} />
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    setPreviewImage({ uri: item.image_display_url ?? '', title: item.name });
+                  }}
+                  style={styles.imageTapArea}
+                >
+                  <Image source={{ uri: item.image_display_url }} style={styles.tradeImage} />
+                </Pressable>
               ) : null}
 
               <View style={styles.tradeDetailGrid}>
@@ -575,25 +635,32 @@ export function TradesScreen({ userId }: TradesScreenProps) {
 
                 <View style={styles.imageEditBox}>
                   <Text style={styles.sectionLabel}>取引画像</Text>
-                  {imageUri ? (
-                    <Image source={{ uri: imageUri }} style={styles.previewImage} />
-                  ) : editingTrade?.image_display_url && storedImageValue ? (
-                    <Image source={{ uri: editingTrade.image_display_url }} style={styles.previewImage} />
+                  {currentEditImageUri ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setPreviewImage({ uri: currentEditImageUri, title: '取引画像' })}
+                    >
+                      <Image source={{ uri: currentEditImageUri }} style={styles.previewImage} />
+                    </Pressable>
                   ) : (
                     <View style={styles.previewPlaceholder}>
                       <Text style={styles.placeholderText}>画像なし</Text>
                     </View>
                   )}
+                  {uploadingImage ? (
+                    <View style={styles.uploadNotice}>
+                      <ActivityIndicator color={colors.primary} size="small" />
+                      <Text style={styles.uploadNoticeText}>画像をアップロード中...</Text>
+                    </View>
+                  ) : null}
                   <View style={styles.rowActions}>
-                    <AppButton label="画像を選ぶ" variant="secondary" onPress={pickImage} />
+                    <AppButton label="画像を選ぶ" variant="secondary" disabled={saving} onPress={pickImage} />
+                    <AppButton label="撮影する" variant="secondary" disabled={saving} onPress={takePhoto} />
                     <AppButton
                       label="画像を外す"
                       variant="ghost"
-                      onPress={() => {
-                        setImageUri(null);
-                        setImageName(null);
-                        setStoredImageValue(null);
-                      }}
+                      disabled={saving || !currentEditImageUri}
+                      onPress={confirmRemoveImage}
                     />
                   </View>
                 </View>
@@ -613,10 +680,19 @@ export function TradesScreen({ userId }: TradesScreenProps) {
                 ) : null}
               </View>
             </View>
-            <AppButton label={saving ? '保存中...' : '保存する'} disabled={saving} onPress={saveTrade} />
+            <AppButton
+              label={uploadingImage ? '画像アップロード中...' : saving ? '保存中...' : '保存する'}
+              disabled={saving}
+              onPress={saveTrade}
+            />
           </View>
         </ScrollView>
       </Modal>
+      <ImagePreviewModal
+        uri={previewImage?.uri ?? null}
+        title={previewImage?.title}
+        onClose={() => setPreviewImage(null)}
+      />
     </View>
   );
 }
@@ -965,6 +1041,9 @@ const styles = StyleSheet.create({
     height: 180,
     width: '100%',
   },
+  imageTapArea: {
+    borderRadius: 8,
+  },
   tradeDetailGrid: {
     gap: 8,
   },
@@ -1170,6 +1249,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 140,
     justifyContent: 'center',
+  },
+  uploadNotice: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  uploadNoticeText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
   },
   placeholderText: {
     color: colors.muted,

@@ -14,6 +14,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { AppButton } from '../components/AppButton';
 import { EmptyState } from '../components/EmptyState';
+import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { QuantityStepper } from '../components/QuantityStepper';
 import { TextField } from '../components/TextField';
 import { colors } from '../lib/theme';
@@ -24,6 +25,11 @@ import { getStoredImageValue, removeStoredImage, uploadPrivateImageFromUri } fro
 type InventoryScreenProps = {
   userId: string;
 };
+
+type ImagePreview = {
+  uri: string;
+  title: string;
+} | null;
 
 export function InventoryScreen({ userId }: InventoryScreenProps) {
   const [items, setItems] = useState<GoodsItem[]>([]);
@@ -38,6 +44,8 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageName, setImageName] = useState<string | null>(null);
   const [storedImageValue, setStoredImageValue] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<ImagePreview>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -97,9 +105,49 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
     });
 
     if (!result.canceled) {
-      setImageUri(result.assets[0]?.uri ?? null);
-      setImageName(result.assets[0]?.fileName ?? null);
+      applyPickedImage(result.assets[0]);
     }
+  }
+
+  async function takePhoto() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('撮影できません', 'カメラへのアクセスを許可してください。');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      quality: 0.82,
+    });
+
+    if (!result.canceled) {
+      applyPickedImage(result.assets[0]);
+    }
+  }
+
+  function applyPickedImage(asset: ImagePicker.ImagePickerAsset | undefined) {
+    if (!asset?.uri) return;
+    setImageUri(asset.uri);
+    setImageName(asset.fileName ?? null);
+  }
+
+  function clearImage() {
+    setImageUri(null);
+    setImageName(null);
+    setStoredImageValue(null);
+  }
+
+  function confirmRemoveImage() {
+    if (!currentEditImageUri) return;
+    Alert.alert('画像を外しますか？', '保存するまで変更は確定しません。', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '外す',
+        style: 'destructive',
+        onPress: clearImage,
+      },
+    ]);
   }
 
   async function saveItem() {
@@ -112,6 +160,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
     try {
       let nextImageValue = storedImageValue;
       if (imageUri) {
+        setUploadingImage(true);
         nextImageValue = await uploadPrivateImageFromUri({
           userId,
           uri: imageUri,
@@ -145,6 +194,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
     } catch (error) {
       showError('在庫の保存に失敗しました', error);
     } finally {
+      setUploadingImage(false);
       setSaving(false);
     }
   }
@@ -189,6 +239,8 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
     ]);
   }
 
+  const currentEditImageUri = imageUri ?? (editingItem?.image_display_url && storedImageValue ? editingItem.image_display_url : null);
+
   return (
     <View style={styles.screen}>
       <View style={styles.toolbar}>
@@ -219,7 +271,16 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
             return (
               <Pressable style={styles.card} onPress={() => openEdit(item)}>
                 {item.image_display_url ? (
-                  <Image source={{ uri: item.image_display_url }} style={styles.goodsImage} />
+                  <Pressable
+                    accessibilityRole="imagebutton"
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      setPreviewImage({ uri: item.image_display_url ?? '', title: `${item.type} / ${item.char}` });
+                    }}
+                    style={styles.imageTapArea}
+                  >
+                    <Image source={{ uri: item.image_display_url }} style={styles.goodsImage} />
+                  </Pressable>
                 ) : (
                   <View style={styles.imagePlaceholder}>
                     <Text style={styles.imagePlaceholderText}>No Image</Text>
@@ -267,35 +328,51 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
 
           <View style={styles.imageEditBox}>
             <Text style={styles.stepperLabel}>グッズ画像</Text>
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.previewImage} />
-            ) : editingItem?.image_display_url && storedImageValue ? (
-              <Image source={{ uri: editingItem.image_display_url }} style={styles.previewImage} />
+            {currentEditImageUri ? (
+              <Pressable
+                accessibilityRole="imagebutton"
+                onPress={() => setPreviewImage({ uri: currentEditImageUri, title: 'グッズ画像' })}
+              >
+                <Image source={{ uri: currentEditImageUri }} style={styles.previewImage} />
+              </Pressable>
             ) : (
               <View style={styles.previewPlaceholder}>
                 <Text style={styles.imagePlaceholderText}>画像なし</Text>
               </View>
             )}
+            {uploadingImage ? (
+              <View style={styles.uploadNotice}>
+                <ActivityIndicator color={colors.primary} size="small" />
+                <Text style={styles.uploadNoticeText}>画像をアップロード中...</Text>
+              </View>
+            ) : null}
             <View style={styles.rowActions}>
-              <AppButton label="画像を選ぶ" variant="secondary" onPress={pickImage} />
+              <AppButton label="画像を選ぶ" variant="secondary" disabled={saving} onPress={pickImage} />
+              <AppButton label="撮影する" variant="secondary" disabled={saving} onPress={takePhoto} />
               <AppButton
                 label="画像を外す"
                 variant="ghost"
-                onPress={() => {
-                  setImageUri(null);
-                  setImageName(null);
-                  setStoredImageValue(null);
-                }}
+                disabled={saving || !currentEditImageUri}
+                onPress={confirmRemoveImage}
               />
             </View>
           </View>
 
           <View style={styles.modalActions}>
             <AppButton label="キャンセル" variant="ghost" disabled={saving} onPress={() => setModalVisible(false)} />
-            <AppButton label={saving ? '保存中...' : '保存する'} disabled={saving} onPress={saveItem} />
+            <AppButton
+              label={uploadingImage ? '画像アップロード中...' : saving ? '保存中...' : '保存する'}
+              disabled={saving}
+              onPress={saveItem}
+            />
           </View>
         </ScrollView>
       </Modal>
+      <ImagePreviewModal
+        uri={previewImage?.uri ?? null}
+        title={previewImage?.title}
+        onClose={() => setPreviewImage(null)}
+      />
     </View>
   );
 }
@@ -339,6 +416,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 72,
     width: 72,
+  },
+  imageTapArea: {
+    borderRadius: 8,
   },
   imagePlaceholder: {
     alignItems: 'center',
@@ -451,8 +531,23 @@ const styles = StyleSheet.create({
     height: 140,
     justifyContent: 'center',
   },
+  uploadNotice: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  uploadNoticeText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   rowActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   modalActions: {
