@@ -1,221 +1,126 @@
 # 販売用 Supabase 分離手順
 
-販売版では、現在の実データ入りSupabaseをそのまま使わないでください。X ID、取引画像、メモ、発送予定などは個人情報に近い情報です。開発用と販売用を分けることで、テスト中の操作や不具合で奥様のデータに影響しない状態にします。
+販売版では、現在の奥さま用Supabase projectをそのまま使わないでください。
+X ID、取引画像、メモ、発送予定などは個人情報に近い情報です。
+販売/審査/テスト用には、新しいSupabase projectを別に作ります。
+
+## 目的
+
+- 奥さまの実データを販売用アプリから完全に切り離す
+- App Store / Google Play 審査時にテストデータだけで確認できるようにする
+- 今後のアプリ改善は同じコードで進め、接続先だけ切り替える
 
 ## 1. 新しいSupabase projectを作る
 
-1. Supabase Dashboardを開く
-2. New projectを作成
-3. 名前は例として `goods-trade-manager-production`
-4. Regionは主な利用者に近い場所を選ぶ
-5. Project URL と publishable key を控える
+1. Supabase Dashboardを開きます。
+2. 左上の組織が正しいことを確認します。
+3. `New project` を押します。
+4. 名前は例として `goods-trade-manager-production` にします。
+5. Database Passwordを設定します。これは後で必要になる可能性があるので控えておきます。
+6. Regionは主な利用者に近い場所を選びます。
+7. `Create new project` を押し、作成完了まで待ちます。
 
-## 2. テーブルを作る
+この時点では、奥さま用projectは触りません。
 
-新しいプロジェクトの SQL Editor で以下を実行します。
+## 2. Project URL と publishable key を控える
 
-```sql
-create extension if not exists pgcrypto;
+新しく作った販売/審査用projectで次を確認します。
 
-create table if not exists public.goods (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  type text not null,
-  char text not null,
-  count integer not null default 0 check (count >= 0),
-  planned_count integer not null default 0 check (planned_count >= 0),
-  image_url text,
-  sort_order integer default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+1. 左下の歯車、または `Project Settings` を開きます。
+2. `API` を開きます。
+3. `Project URL` を控えます。
+4. `API Keys` にある `publishable` または `anon public` keyを控えます。
 
-create table if not exists public.trades (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  name text not null,
-  type text not null default '交換',
-  status text not null default '成約',
-  memo text,
-  give_items jsonb not null default '[]'::jsonb,
-  receive_items jsonb not null default '[]'::jsonb,
-  give_price integer not null default 0,
-  receive_price integer not null default 0,
-  image_url text,
-  is_packed boolean not null default false,
-  is_sent boolean not null default false,
-  is_received boolean not null default false,
-  est_ship_date date,
-  est_receive_date date,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+控える値は販売/審査用projectのものだけです。
+奥さま用projectのURL/keyをここに混ぜないでください。
 
-create index if not exists goods_user_id_idx on public.goods(user_id);
-create index if not exists trades_user_id_idx on public.trades(user_id);
-create index if not exists trades_user_status_idx on public.trades(user_id, status);
+## 3. 初期化SQLを実行する
 
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
+新しく作った販売/審査用projectでだけ実行します。
 
-drop trigger if exists set_goods_updated_at on public.goods;
-create trigger set_goods_updated_at
-before update on public.goods
-for each row execute function public.set_updated_at();
+1. 左メニューの `SQL Editor` を開きます。
+2. `New query` または `+` を押します。
+3. このリポジトリの [PRODUCTION_SUPABASE_INIT.sql](./PRODUCTION_SUPABASE_INIT.sql) を開きます。
+4. ファイルの中身を最初から最後まで全部コピーします。
+5. SupabaseのSQL Editorに貼り付けます。
+6. `Run` を押します。
 
-drop trigger if exists set_trades_updated_at on public.trades;
-create trigger set_trades_updated_at
-before update on public.trades
-for each row execute function public.set_updated_at();
-```
+成功すると `Success. No rows returned` のような表示になります。
 
-## 3. RLSを有効にする
+警告が出た場合:
 
-同じ SQL Editor で以下を実行します。
+- 新しく作った空の販売/審査用projectなら `Run query` で進めて大丈夫です。
+- 奥さま用projectを開いている場合は、必ず `Cancel` してください。
 
-```sql
-alter table public.goods enable row level security;
-alter table public.trades enable row level security;
+このSQLは、実データを作成・コピーしません。
+作るものは、`goods` / `trades` テーブル、ユーザー分離用RLS、private画像bucketだけです。
 
-create policy "Users can read own goods"
-on public.goods
-for select
-to authenticated
-using (user_id = auth.uid());
+## 4. 安全設定を確認する
 
-create policy "Users can insert own goods"
-on public.goods
-for insert
-to authenticated
-with check (user_id = auth.uid());
+初期化後、新しい販売/審査用projectで [../SUPABASE_SECURITY_CHECK.sql](../SUPABASE_SECURITY_CHECK.sql) を実行します。
 
-create policy "Users can update own goods"
-on public.goods
-for update
-to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
+確認するポイント:
 
-create policy "Users can delete own goods"
-on public.goods
-for delete
-to authenticated
-using (user_id = auth.uid());
+- `goods` と `trades` の `rls_enabled` が `true`
+- `goods` と `trades` のpolicyが `authenticated` かつ `user_id = auth.uid()` になっている
+- `mailing-images` bucket の `public` が `false`
+- storage policyが `mailing-images` かつ本人のユーザーIDフォルダだけを許可している
 
-create policy "Users can read own trades"
-on public.trades
-for select
-to authenticated
-using (user_id = auth.uid());
-
-create policy "Users can insert own trades"
-on public.trades
-for insert
-to authenticated
-with check (user_id = auth.uid());
-
-create policy "Users can update own trades"
-on public.trades
-for update
-to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
-
-create policy "Users can delete own trades"
-on public.trades
-for delete
-to authenticated
-using (user_id = auth.uid());
-```
-
-## 4. private画像bucketを作る
-
-SQL Editor で以下を実行します。
-
-```sql
-insert into storage.buckets (id, name, public)
-values ('mailing-images', 'mailing-images', false)
-on conflict (id) do update set public = false;
-
-create policy "Users can read own mailing images"
-on storage.objects
-for select
-to authenticated
-using (
-  bucket_id = 'mailing-images'
-  and (storage.foldername(name))[1] = auth.uid()::text
-);
-
-create policy "Users can upload own mailing images"
-on storage.objects
-for insert
-to authenticated
-with check (
-  bucket_id = 'mailing-images'
-  and (storage.foldername(name))[1] = auth.uid()::text
-);
-
-create policy "Users can update own mailing images"
-on storage.objects
-for update
-to authenticated
-using (
-  bucket_id = 'mailing-images'
-  and (storage.foldername(name))[1] = auth.uid()::text
-)
-with check (
-  bucket_id = 'mailing-images'
-  and (storage.foldername(name))[1] = auth.uid()::text
-);
-
-create policy "Users can delete own mailing images"
-on storage.objects
-for delete
-to authenticated
-using (
-  bucket_id = 'mailing-images'
-  and (storage.foldername(name))[1] = auth.uid()::text
-);
-```
+新しいprojectなので、Storage object数は `0` で問題ありません。
 
 ## 5. Auth設定
 
 Authenticationの設定で以下を行います。
 
-1. Email providerを有効にする
-2. Confirm signup のメール件名と本文をアプリ名に合わせる
-3. URL Configuration の Redirect URLs に `goodstrade://auth/callback` を追加する
-4. 本番ビルド後に、必要なら本番用のdeep linkやWeb fallback URLも追加する
+1. `Authentication` を開きます。
+2. `Providers` で Email provider を有効にします。
+3. `URL Configuration` を開きます。
+4. `Redirect URLs` に次を追加します。
+
+```text
+goodstrade://auth/callback
+```
+
+5. 新規登録メールの件名と本文を、アプリ名が分かる内容に変更します。
+
+本番ビルド後は、必要に応じてApp Store / Google Play用のdeep linkやWeb fallback URLも追加します。
 
 ## 6. アプリ側の接続先を切り替える
 
-接続先の切り替えルールは `ENVIRONMENTS.md` にまとめています。
-販売/審査用に起動・ビルドする時は、`mobile/.env.production.example` を参考に `.env.production` を作ります。
+PCでPowerShellを開きます。
 
 ```powershell
+cd D:\リポジトリ\在庫管理_codex\mobile
 copy .env.production.example .env.production
 ```
 
-その後、`.env.production` を販売用Supabaseの Project URL と publishable key に書き換えます。
-販売/審査用で起動・ビルドする直前に、`.env.production` を `.env` にコピーします。
+次に `mobile/.env.production` を開き、販売/審査用Supabaseの値に書き換えます。
+
+```text
+EXPO_PUBLIC_SUPABASE_URL=https://your-production-project.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_replace_me
+```
+
+販売/審査用で起動する直前に、次を実行します。
 
 ```powershell
 copy .env.production .env
+npm.cmd start -- --tunnel --clear
 ```
 
-奥さま用Supabaseの値を販売/審査用 `.env.production` に入れないでください。
+奥さま用に戻す時は、次を実行します。
+
+```powershell
+copy .env.wife .env
+npm.cmd start -- --tunnel --clear
+```
+
+切り替え前に `mobile/.env` のURLを確認してください。
 
 ## 7. 販売前チェック
 
-- 奥様の実データを販売用Supabaseへコピーしない
-- テストユーザーを2人作り、互いの在庫・取引・画像が見えないことを確認する
-- `mailing-images` bucket の Public bucket が OFF であることを確認する
-- 新規登録メールがアプリ名で届くことを確認する
-- 画像アップロード後、別ユーザーからURLを推測しても見えないことを確認する
+- 奥さまの実データを販売用Supabaseへコピーしていない
+- テストユーザーを2人作り、互いの在庫・取引・画像が見えない
+- `mailing-images` bucket の Public bucket が OFF
+- 新規登録メールを見て、何のアプリの認証か分かる
+- 画像アップロード後、別ユーザーから画像URLを推測しても見えない
