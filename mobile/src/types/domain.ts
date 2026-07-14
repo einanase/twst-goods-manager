@@ -14,7 +14,7 @@ export type GoodsItem = {
   updated_at?: string;
 };
 
-export type TradeStatus = '成約' | '仮約束' | 'お声掛け中' | 'キャンセル';
+export type TradeStatus = '取引完了' | '成約' | '仮約束' | 'お声掛け中' | 'キャンセル';
 export type TradeType = '交換' | '譲渡' | '交換+譲渡';
 
 export type TradeItem = {
@@ -31,6 +31,8 @@ export type Trade = {
   memo: string | null;
   give_items: TradeItem[];
   receive_items: TradeItem[];
+  give_price: number;
+  receive_price: number;
   image_url: string | null;
   image_display_url?: string;
   is_packed: boolean;
@@ -58,6 +60,8 @@ export type TradeInput = {
   memo: string | null;
   give_items: TradeItem[];
   receive_items: TradeItem[];
+  give_price: number;
+  receive_price: number;
   image_url: string | null;
   is_packed: boolean;
   is_sent: boolean;
@@ -65,4 +69,3 @@ export type TradeInput = {
   est_ship_date: string | null;
   est_receive_date: string | null;
 };
-

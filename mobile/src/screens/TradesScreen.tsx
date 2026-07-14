@@ -34,14 +34,17 @@ type ImagePreview = {
 } | null;
 
 const tradeTypes: TradeType[] = ['交換', '譲渡', '交換+譲渡'];
-const statuses: TradeStatus[] = ['成約', '仮約束', 'お声掛け中'];
+const statuses: TradeStatus[] = ['取引完了', '成約', '仮約束', 'お声掛け中'];
 const flagLabels = {
   is_packed: '梱包',
   is_sent: '発送',
   is_received: '受取',
 };
+const progressStatuses: TradeStatus[] = ['成約', '取引完了'];
+const calendarWeekdays = ['日', '月', '火', '水', '木', '金', '土'];
 
 type TradeFormStep = 'basic' | 'items' | 'progress' | 'notes';
+type CalendarTarget = 'ship' | 'receive' | null;
 
 const tradeFormSteps: Array<{ key: TradeFormStep; label: string }> = [
   { key: 'basic', label: '基本' },
@@ -66,6 +69,8 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   const [memo, setMemo] = useState('');
   const [giveItems, setGiveItems] = useState<TradeItem[]>([]);
   const [receiveItems, setReceiveItems] = useState<TradeItem[]>([]);
+  const [givePrice, setGivePrice] = useState('');
+  const [receivePrice, setReceivePrice] = useState('');
   const [isPacked, setIsPacked] = useState(false);
   const [isSent, setIsSent] = useState(false);
   const [isReceived, setIsReceived] = useState(false);
@@ -77,6 +82,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   const [tradeFormStep, setTradeFormStep] = useState<TradeFormStep>('basic');
   const [previewImage, setPreviewImage] = useState<ImagePreview>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [calendarTarget, setCalendarTarget] = useState<CalendarTarget>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -114,6 +120,8 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     setMemo('');
     setGiveItems([]);
     setReceiveItems([]);
+    setGivePrice('');
+    setReceivePrice('');
     setIsPacked(false);
     setIsSent(false);
     setIsReceived(false);
@@ -134,6 +142,8 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     setMemo(trade.memo ?? '');
     setGiveItems(trade.give_items ?? []);
     setReceiveItems(trade.receive_items ?? []);
+    setGivePrice(String(trade.give_price ?? 0));
+    setReceivePrice(String(trade.receive_price ?? 0));
     setIsPacked(Boolean(trade.is_packed));
     setIsSent(Boolean(trade.is_sent));
     setIsReceived(Boolean(trade.is_received));
@@ -204,15 +214,69 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     ]);
   }
 
-  async function saveTrade() {
+  function buildTradeInput(nextImageValue: string | null): TradeInput | null {
     if (!name.trim()) {
       Alert.alert('入力不足', '相手のX IDまたは名前を入力してください。');
-      return;
+      return null;
     }
 
+    const nextGivePrice = parseMoneyInput(givePrice);
+    const nextReceivePrice = parseMoneyInput(receivePrice);
+    const normalizedGiveItems = giveItems.filter((item) => item.count > 0);
+    const normalizedReceiveItems = receiveItems.filter((item) => item.count > 0);
+    const hasItems = Boolean(normalizedGiveItems.length || normalizedReceiveItems.length);
+    const hasMoney = Boolean(nextGivePrice || nextReceivePrice);
+
+    if (!hasItems && !hasMoney) {
+      Alert.alert('取引内容を入力してください', '渡すもの、受けるもの、または金額を1つ以上入力してください。');
+      return null;
+    }
+
+    const progressManaged = canManageProgress(status);
+    const nextPacked = progressManaged ? isPacked : false;
+    const nextSent = progressManaged ? isSent : false;
+    const nextReceived = progressManaged ? isReceived : false;
+
+    if (status === '取引完了' && !(nextPacked && nextSent && nextReceived)) {
+      Alert.alert('取引完了にできません', '取引完了にするには、梱包・発送・受取をすべて済にしてください。');
+      return null;
+    }
+
+    return {
+      name: name.trim(),
+      type,
+      status,
+      memo: memo.trim() || null,
+      give_items: normalizedGiveItems,
+      receive_items: normalizedReceiveItems,
+      give_price: nextGivePrice,
+      receive_price: nextReceivePrice,
+      image_url: nextImageValue,
+      is_packed: nextPacked,
+      is_sent: nextSent,
+      is_received: nextReceived,
+      est_ship_date: normalizeDateInput(shipDate),
+      est_receive_date: normalizeDateInput(receiveDate),
+    };
+  }
+
+  function saveTrade() {
+    const input = buildTradeInput(storedImageValue);
+    if (!input) return;
+
+    Alert.alert('保存前に確認してください', buildTradeSummaryMessage(input, goods, Boolean(imageUri)), [
+      { text: '戻る', style: 'cancel' },
+      {
+        text: '保存する',
+        onPress: () => persistTrade(input),
+      },
+    ]);
+  }
+
+  async function persistTrade(baseInput: TradeInput) {
     setSaving(true);
     try {
-      let nextImageValue = storedImageValue;
+      let nextImageValue = baseInput.image_url;
       if (imageUri) {
         setUploadingImage(true);
         nextImageValue = await uploadPrivateImageFromUri({
@@ -223,29 +287,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
         });
       }
 
-      const contracted = status === '成約';
-      const normalizedGiveItems = giveItems.filter((item) => item.count > 0);
-      const normalizedReceiveItems = receiveItems.filter((item) => item.count > 0);
-      if (!normalizedGiveItems.length && !normalizedReceiveItems.length) {
-        Alert.alert('アイテムを選んでください', '渡すもの、または受けるものを1つ以上選んでください。');
-        return;
-      }
-
-      const input: TradeInput = {
-        name: name.trim(),
-        type,
-        status,
-        memo: memo.trim() || null,
-        give_items: normalizedGiveItems,
-        receive_items: normalizedReceiveItems,
-        image_url: nextImageValue,
-        is_packed: contracted ? isPacked : false,
-        is_sent: contracted ? isSent : false,
-        is_received: contracted ? isReceived : false,
-        est_ship_date: shipDate.trim() || null,
-        est_receive_date: receiveDate.trim() || null,
-      };
-
+      const input = { ...baseInput, image_url: nextImageValue };
       const oldTrade = editingTrade;
       const saved = oldTrade
         ? await updateTrade(userId, editingTrade.id, input)
@@ -287,12 +329,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   async function applyStatusChange(trade: Trade, nextStatus: TradeStatus) {
     const previous = trades;
     const previousGoods = goods;
-    const patch = {
-      status: nextStatus,
-      is_packed: nextStatus === '成約' ? Boolean(trade.is_packed) : false,
-      is_sent: nextStatus === '成約' ? Boolean(trade.is_sent) : false,
-      is_received: nextStatus === '成約' ? Boolean(trade.is_received) : false,
-    };
+    const patch = buildStatusPatch(trade, nextStatus);
 
     setTrades((current) =>
       current.map((candidate) =>
@@ -313,13 +350,49 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     }
   }
 
-  async function updateTradeFlag(trade: Trade, field: 'is_packed' | 'is_sent' | 'is_received', value: boolean) {
-    if (trade.status !== '成約') {
-      Alert.alert('成約以外では変更できません', '梱包・発送・受取の管理はステータスが成約の取引で使えます。');
+  function updateTradeFlag(trade: Trade, field: 'is_packed' | 'is_sent' | 'is_received', value: boolean) {
+    if (!canManageProgress(trade.status)) {
+      Alert.alert('進行管理できません', '梱包・発送・受取の管理はステータスが成約または取引完了の取引で使えます。');
       return;
     }
 
     const action = value ? '済みにする' : '未完了に戻す';
+    const nextFlags = getNextTradeFlags(trade, field, value);
+
+    if (value && trade.status === '成約' && isTradeProgressComplete(nextFlags)) {
+      Alert.alert(
+        '取引完了にしますか？',
+        `${trade.name} の梱包・発送・受取がすべて済になります。ステータスも「取引完了」に変更しますか？`,
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          {
+            text: '済だけ変更',
+            onPress: () => applyTradeFlagChange(trade, field, value),
+          },
+          {
+            text: '取引完了にする',
+            onPress: () => applyTradeFlagChange(trade, field, value, '取引完了'),
+          },
+        ],
+      );
+      return;
+    }
+
+    if (!value && trade.status === '取引完了') {
+      Alert.alert(
+        '取引完了を戻しますか？',
+        `${trade.name} の「${flagLabels[field]}」を未完了に戻し、ステータスも「成約」に戻します。`,
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          {
+            text: '戻す',
+            onPress: () => applyTradeFlagChange(trade, field, value, '成約'),
+          },
+        ],
+      );
+      return;
+    }
+
     Alert.alert(
       `${flagLabels[field]}を変更しますか？`,
       `${trade.name} の「${flagLabels[field]}」を${action}操作です。発送・受取は在庫数にも反映されます。`,
@@ -337,14 +410,19 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     trade: Trade,
     field: 'is_packed' | 'is_sent' | 'is_received',
     value: boolean,
+    nextStatus?: TradeStatus,
   ) {
     const previous = trades;
     const previousGoods = goods;
-    const optimistic = { ...trade, [field]: value };
+    const patch = {
+      [field]: value,
+      ...(nextStatus ? { status: nextStatus } : {}),
+    };
+    const optimistic = { ...trade, ...patch };
     setTrades((current) => upsertTrade(current, optimistic));
 
     try {
-      const saved = await patchTrade(userId, trade.id, { [field]: value });
+      const saved = await patchTrade(userId, trade.id, patch);
       const nextTrades = upsertTrade(previous, saved);
       const nextGoods = await syncStockAfterTradeChange(trade, saved, previousGoods, nextTrades, userId);
       setTrades(nextTrades);
@@ -365,7 +443,11 @@ export function TradesScreen({ userId }: TradesScreenProps) {
         text: '変更する',
         onPress: () => {
           setStatus(nextStatus);
-          if (nextStatus !== '成約') {
+          if (nextStatus === '取引完了') {
+            setIsPacked(true);
+            setIsSent(true);
+            setIsReceived(true);
+          } else if (!canManageProgress(nextStatus)) {
             setIsPacked(false);
             setIsSent(false);
             setIsReceived(false);
@@ -384,6 +466,52 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     if (currentValue === nextValue) return;
 
     const action = nextValue ? '済みにする' : '未完了に戻す';
+    const nextFlags = getNextModalFlags(field, nextValue, {
+      is_packed: isPacked,
+      is_sent: isSent,
+      is_received: isReceived,
+    });
+
+    if (nextValue && status === '成約' && isTradeProgressComplete(nextFlags)) {
+      Alert.alert(
+        '取引完了にしますか？',
+        '梱包・発送・受取がすべて済になります。ステータスも「取引完了」に変更しますか？',
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          {
+            text: '済だけ変更',
+            onPress: () => setter(nextValue),
+          },
+          {
+            text: '取引完了にする',
+            onPress: () => {
+              setter(nextValue);
+              setStatus('取引完了');
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    if (!nextValue && status === '取引完了') {
+      Alert.alert(
+        '取引完了を戻しますか？',
+        `「${flagLabels[field]}」を未完了に戻し、ステータスも「成約」に戻します。`,
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          {
+            text: '戻す',
+            onPress: () => {
+              setter(nextValue);
+              setStatus('成約');
+            },
+          },
+        ],
+      );
+      return;
+    }
+
     Alert.alert(
       `${flagLabels[field]}を変更しますか？`,
       `編集中の取引の「${flagLabels[field]}」を${action}操作です。保存すると在庫計算に反映されます。`,
@@ -511,23 +639,30 @@ export function TradesScreen({ userId }: TradesScreenProps) {
                 <TradeItemsLabel title="受けるもの" items={item.receive_items} goods={goods} />
               </View>
 
+              {item.give_price || item.receive_price ? (
+                <View style={styles.moneySummaryRow}>
+                  <MoneySummary label="渡す金額" amount={item.give_price ?? 0} />
+                  <MoneySummary label="受ける金額" amount={item.receive_price ?? 0} />
+                </View>
+              ) : null}
+
               <View style={styles.progressRow}>
                 <ProgressPill
                   label="梱包"
                   done={Boolean(item.is_packed)}
-                  disabled={item.status !== '成約'}
+                  disabled={!canManageProgress(item.status)}
                   onPress={() => updateTradeFlag(item, 'is_packed', !item.is_packed)}
                 />
                 <ProgressPill
                   label="発送"
                   done={Boolean(item.is_sent)}
-                  disabled={item.status !== '成約'}
+                  disabled={!canManageProgress(item.status)}
                   onPress={() => updateTradeFlag(item, 'is_sent', !item.is_sent)}
                 />
                 <ProgressPill
                   label="受取"
                   done={Boolean(item.is_received)}
-                  disabled={item.status !== '成約'}
+                  disabled={!canManageProgress(item.status)}
                   onPress={() => updateTradeFlag(item, 'is_received', !item.is_received)}
                 />
               </View>
@@ -573,6 +708,25 @@ export function TradesScreen({ userId }: TradesScreenProps) {
               <>
                 <TradeItemEditor title="渡すもの" goods={goods} items={giveItems} onChange={setGiveItems} />
                 <TradeItemEditor title="受けるもの" goods={goods} items={receiveItems} onChange={setReceiveItems} />
+                <View style={styles.moneyPanel}>
+                  <Text style={styles.sectionLabel}>お金のやり取り</Text>
+                  <View style={styles.moneyInputGrid}>
+                    <TextField
+                      label="渡す金額"
+                      value={givePrice}
+                      onChangeText={(value) => setGivePrice(toMoneyInput(value))}
+                      placeholder="0"
+                      keyboardType="number-pad"
+                    />
+                    <TextField
+                      label="受ける金額"
+                      value={receivePrice}
+                      onChangeText={(value) => setReceivePrice(toMoneyInput(value))}
+                      placeholder="0"
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                </View>
               </>
             ) : null}
 
@@ -585,7 +739,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
                     onValueChange={(nextValue) =>
                       confirmModalFlagChange('is_packed', isPacked, nextValue, setIsPacked)
                     }
-                    disabled={status !== '成約'}
+                    disabled={!canManageProgress(status)}
                   />
                   <ToggleRow
                     label="発送済"
@@ -593,7 +747,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
                     onValueChange={(nextValue) =>
                       confirmModalFlagChange('is_sent', isSent, nextValue, setIsSent)
                     }
-                    disabled={status !== '成約'}
+                    disabled={!canManageProgress(status)}
                   />
                   <ToggleRow
                     label="受取済"
@@ -601,23 +755,21 @@ export function TradesScreen({ userId }: TradesScreenProps) {
                     onValueChange={(nextValue) =>
                       confirmModalFlagChange('is_received', isReceived, nextValue, setIsReceived)
                     }
-                    disabled={status !== '成約'}
+                    disabled={!canManageProgress(status)}
                   />
                 </View>
 
-                <TextField
+                <CalendarField
                   label="発送予定日"
                   value={shipDate}
-                  onChangeText={setShipDate}
-                  placeholder="YYYY-MM-DD"
-                  keyboardType="numbers-and-punctuation"
+                  onPress={() => setCalendarTarget('ship')}
+                  onClear={() => setShipDate('')}
                 />
-                <TextField
+                <CalendarField
                   label="受取予定日"
                   value={receiveDate}
-                  onChangeText={setReceiveDate}
-                  placeholder="YYYY-MM-DD"
-                  keyboardType="numbers-and-punctuation"
+                  onPress={() => setCalendarTarget('receive')}
+                  onClear={() => setReceiveDate('')}
                 />
               </>
             ) : null}
@@ -693,6 +845,22 @@ export function TradesScreen({ userId }: TradesScreenProps) {
         title={previewImage?.title}
         onClose={() => setPreviewImage(null)}
       />
+      <CalendarPickerModal
+        visible={calendarTarget !== null}
+        title={calendarTarget === 'ship' ? '発送予定日を選択' : '受取予定日を選択'}
+        value={calendarTarget === 'ship' ? shipDate : receiveDate}
+        onClose={() => setCalendarTarget(null)}
+        onClear={() => {
+          if (calendarTarget === 'ship') setShipDate('');
+          if (calendarTarget === 'receive') setReceiveDate('');
+          setCalendarTarget(null);
+        }}
+        onSelect={(date) => {
+          if (calendarTarget === 'ship') setShipDate(date);
+          if (calendarTarget === 'receive') setReceiveDate(date);
+          setCalendarTarget(null);
+        }}
+      />
     </View>
   );
 }
@@ -714,6 +882,121 @@ function TradeItemsLabel({ title, items, goods }: { title: string; items: TradeI
         <Text style={styles.tradeItemsTextMuted}>なし</Text>
       )}
     </View>
+  );
+}
+
+function MoneySummary({ label, amount }: { label: string; amount: number }) {
+  return (
+    <View style={styles.moneySummaryBox}>
+      <Text style={styles.moneySummaryLabel}>{label}</Text>
+      <Text style={styles.moneySummaryValue}>{formatMoney(amount)}</Text>
+    </View>
+  );
+}
+
+function CalendarField({
+  label,
+  value,
+  onPress,
+  onClear,
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <View style={styles.calendarField}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      <View style={styles.calendarFieldRow}>
+        <Pressable accessibilityRole="button" onPress={onPress} style={styles.calendarValueButton}>
+          <Text style={[styles.calendarValueText, !value ? styles.calendarValuePlaceholder : null]}>
+            {value || '日付を選択'}
+          </Text>
+        </Pressable>
+        {value ? <AppButton label="消す" variant="ghost" onPress={onClear} /> : null}
+      </View>
+    </View>
+  );
+}
+
+function CalendarPickerModal({
+  visible,
+  title,
+  value,
+  onSelect,
+  onClear,
+  onClose,
+}: {
+  visible: boolean;
+  title: string;
+  value: string;
+  onSelect: (date: string) => void;
+  onClear: () => void;
+  onClose: () => void;
+}) {
+  const selectedDate = parseDateValue(value);
+  const [visibleMonth, setVisibleMonth] = useState(() => selectedDate ?? new Date());
+
+  useEffect(() => {
+    if (visible) {
+      setVisibleMonth(selectedDate ?? new Date());
+    }
+  }, [selectedDate?.getTime(), visible]);
+
+  const year = visibleMonth.getFullYear();
+  const month = visibleMonth.getMonth();
+  const days = buildCalendarDays(year, month);
+
+  function moveMonth(diff: number) {
+    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + diff, 1));
+  }
+
+  return (
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+      <View style={styles.calendarOverlay}>
+        <View style={styles.calendarPanel}>
+          <Text style={styles.calendarTitle}>{title}</Text>
+          <View style={styles.calendarHeader}>
+            <AppButton label="前月" variant="ghost" onPress={() => moveMonth(-1)} />
+            <Text style={styles.calendarMonthText}>{year}年 {month + 1}月</Text>
+            <AppButton label="翌月" variant="ghost" onPress={() => moveMonth(1)} />
+          </View>
+          <View style={styles.weekdayRow}>
+            {calendarWeekdays.map((weekday) => (
+              <Text key={weekday} style={styles.weekdayText}>{weekday}</Text>
+            ))}
+          </View>
+          <View style={styles.calendarGrid}>
+            {days.map((date, index) => {
+              if (!date) {
+                return <View key={`empty-${index}`} style={styles.calendarDayPlaceholder} />;
+              }
+
+              const dateValue = formatDateValue(date);
+              const selected = value === dateValue;
+              return (
+                <Pressable
+                  key={dateValue}
+                  accessibilityRole="button"
+                  onPress={() => onSelect(dateValue)}
+                  style={[styles.calendarDayButton, selected ? styles.calendarDaySelected : null]}
+                >
+                  <Text style={[styles.calendarDayText, selected ? styles.calendarDayTextSelected : null]}>
+                    {date.getDate()}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.calendarActions}>
+            <AppButton label="閉じる" variant="cancel" onPress={onClose} />
+            <AppButton label="日付を消す" variant="ghost" onPress={onClear} />
+            <AppButton label="今日" variant="secondary" onPress={() => onSelect(formatDateValue(new Date()))} />
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -844,6 +1127,158 @@ function TradeItemEditor({
       )}
     </View>
   );
+}
+
+function canManageProgress(status: TradeStatus) {
+  return progressStatuses.includes(status);
+}
+
+function isTradeProgressComplete(flags: Pick<Trade, 'is_packed' | 'is_sent' | 'is_received'>) {
+  return Boolean(flags.is_packed && flags.is_sent && flags.is_received);
+}
+
+function getNextTradeFlags(
+  trade: Trade,
+  field: 'is_packed' | 'is_sent' | 'is_received',
+  value: boolean,
+) {
+  return {
+    is_packed: field === 'is_packed' ? value : Boolean(trade.is_packed),
+    is_sent: field === 'is_sent' ? value : Boolean(trade.is_sent),
+    is_received: field === 'is_received' ? value : Boolean(trade.is_received),
+  };
+}
+
+function getNextModalFlags(
+  field: 'is_packed' | 'is_sent' | 'is_received',
+  value: boolean,
+  current: Pick<Trade, 'is_packed' | 'is_sent' | 'is_received'>,
+) {
+  return {
+    is_packed: field === 'is_packed' ? value : current.is_packed,
+    is_sent: field === 'is_sent' ? value : current.is_sent,
+    is_received: field === 'is_received' ? value : current.is_received,
+  };
+}
+
+function buildStatusPatch(trade: Trade, nextStatus: TradeStatus): Partial<TradeInput> {
+  if (nextStatus === '取引完了') {
+    return {
+      status: nextStatus,
+      is_packed: true,
+      is_sent: true,
+      is_received: true,
+    };
+  }
+
+  if (nextStatus === '成約') {
+    return {
+      status: nextStatus,
+      is_packed: Boolean(trade.is_packed),
+      is_sent: Boolean(trade.is_sent),
+      is_received: Boolean(trade.is_received),
+    };
+  }
+
+  return {
+    status: nextStatus,
+    is_packed: false,
+    is_sent: false,
+    is_received: false,
+  };
+}
+
+function toMoneyInput(value: string) {
+  return value.replace(/[^\d]/g, '');
+}
+
+function parseMoneyInput(value: string) {
+  const normalized = toMoneyInput(value);
+  if (!normalized) return 0;
+  return Number(normalized);
+}
+
+function formatMoney(value: number | null | undefined) {
+  return `${Math.max(0, Number(value ?? 0)).toLocaleString('ja-JP')}円`;
+}
+
+function normalizeDateInput(value: string) {
+  return parseDateValue(value) ? value : null;
+}
+
+function parseDateValue(value: string | null | undefined) {
+  const match = String(value ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  return date;
+}
+
+function formatDateValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildCalendarDays(year: number, month: number) {
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const days: Array<Date | null> = [];
+
+  for (let index = 0; index < firstDay.getDay(); index += 1) {
+    days.push(null);
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    days.push(new Date(year, month, day));
+  }
+
+  while (days.length % 7 !== 0) {
+    days.push(null);
+  }
+
+  return days;
+}
+
+function buildTradeSummaryMessage(input: TradeInput, goods: GoodsItem[], hasNewImage: boolean) {
+  const giveItemsText = formatTradeItemsForSummary(input.give_items, goods);
+  const receiveItemsText = formatTradeItemsForSummary(input.receive_items, goods);
+  const progressText = canManageProgress(input.status)
+    ? `梱包:${input.is_packed ? '済' : '未'} / 発送:${input.is_sent ? '済' : '未'} / 受取:${input.is_received ? '済' : '未'}`
+    : '対象外';
+
+  return [
+    `相手: ${input.name}`,
+    `内容: ${input.type}`,
+    `ステータス: ${input.status}`,
+    `渡すもの: ${giveItemsText}`,
+    `受けるもの: ${receiveItemsText}`,
+    `渡す金額: ${formatMoney(input.give_price)}`,
+    `受ける金額: ${formatMoney(input.receive_price)}`,
+    `発送予定日: ${input.est_ship_date ?? '未設定'}`,
+    `受取予定日: ${input.est_receive_date ?? '未設定'}`,
+    `進行: ${progressText}`,
+    `画像: ${hasNewImage ? '新しい画像あり' : input.image_url ? '登録済み' : 'なし'}`,
+  ].join('\n');
+}
+
+function formatTradeItemsForSummary(items: TradeItem[], goods: GoodsItem[]) {
+  if (!items.length) return 'なし';
+
+  return items
+    .map((item) => {
+      const good = goods.find((candidate) => String(candidate.id) === String(item.id));
+      const label = good ? `${good.type}/${good.char}` : `ID:${item.id}`;
+      return `${label} x${item.count}`;
+    })
+    .join(', ');
 }
 
 function showError(title: string, error: unknown) {
@@ -1047,6 +1482,29 @@ const styles = StyleSheet.create({
   tradeDetailGrid: {
     gap: 8,
   },
+  moneySummaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  moneySummaryBox: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 8,
+    minWidth: 130,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  moneySummaryLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  moneySummaryValue: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 2,
+  },
   tradeItemsBox: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: 8,
@@ -1172,6 +1630,17 @@ const styles = StyleSheet.create({
   segmentedTextActive: {
     color: colors.primaryText,
   },
+  moneyPanel: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    padding: 12,
+  },
+  moneyInputGrid: {
+    gap: 10,
+  },
   checkPanel: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -1193,6 +1662,107 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     color: colors.muted,
+  },
+  calendarField: {
+    gap: 8,
+  },
+  calendarFieldRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  calendarValueButton: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  calendarValueText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  calendarValuePlaceholder: {
+    color: colors.muted,
+  },
+  calendarOverlay: {
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 18,
+  },
+  calendarPanel: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 14,
+    padding: 16,
+  },
+  calendarTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  calendarHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  calendarMonthText: {
+    color: colors.text,
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+  },
+  weekdayText: {
+    color: colors.muted,
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  calendarDayPlaceholder: {
+    aspectRatio: 1,
+    width: `${100 / 7}%`,
+  },
+  calendarDayButton: {
+    alignItems: 'center',
+    aspectRatio: 1,
+    borderRadius: 8,
+    justifyContent: 'center',
+    width: `${100 / 7}%`,
+  },
+  calendarDaySelected: {
+    backgroundColor: colors.primary,
+  },
+  calendarDayText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  calendarDayTextSelected: {
+    color: colors.primaryText,
+  },
+  calendarActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
   },
   tradeItemEditor: {
     backgroundColor: colors.surface,
