@@ -679,7 +679,16 @@ export function TradesScreen({ userId }: TradesScreenProps) {
         }}
       >
         <View style={styles.modalRoot}>
-          <ScrollView contentContainerStyle={styles.modalContent}>
+          {cameraVisible ? (
+            <CameraCaptureModal
+              visible={cameraVisible}
+              title="取引画像を撮影"
+              onCancel={() => setCameraVisible(false)}
+              onUsePhoto={applyCapturedPhoto}
+            />
+          ) : (
+            <>
+              <ScrollView contentContainerStyle={styles.modalContent}>
             <Text style={styles.modalTitle}>{editingTrade ? '取引を編集' : '取引を追加'}</Text>
 
           <View style={styles.formStepTabs}>
@@ -868,18 +877,14 @@ export function TradesScreen({ userId }: TradesScreenProps) {
               setCalendarTarget(null);
             }}
           />
+            </>
+          )}
         </View>
       </Modal>
       <ImagePreviewModal
         uri={previewImage?.uri ?? null}
         title={previewImage?.title}
         onClose={() => setPreviewImage(null)}
-      />
-      <CameraCaptureModal
-        visible={cameraVisible}
-        title="取引画像を撮影"
-        onCancel={() => setCameraVisible(false)}
-        onUsePhoto={applyCapturedPhoto}
       />
     </View>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { CameraView, type CameraType, useCameraPermissions } from 'expo-camera';
 import { colors } from '../lib/theme';
 import { AppButton } from './AppButton';
@@ -23,7 +23,7 @@ type CapturedPhoto = CapturedImageAsset & {
 
 export function CameraCaptureModal({ visible, title, onCancel, onUsePhoto }: CameraCaptureModalProps) {
   const cameraRef = useRef<CameraView | null>(null);
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('back');
   const [cameraReady, setCameraReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -34,8 +34,11 @@ export function CameraCaptureModal({ visible, title, onCancel, onUsePhoto }: Cam
       setCapturedPhoto(null);
       setCameraReady(false);
       setCapturing(false);
+      return;
     }
-  }, [visible]);
+
+    void getPermission();
+  }, [getPermission, visible]);
 
   async function askPermission() {
     const nextPermission = await requestPermission();
@@ -92,70 +95,70 @@ export function CameraCaptureModal({ visible, title, onCancel, onUsePhoto }: Cam
 
   const permissionGranted = Boolean(permission?.granted);
 
-  return (
-    <Modal animationType="slide" visible={visible} onRequestClose={onCancel}>
-      <SafeAreaView style={styles.screen}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{title}</Text>
-          <Pressable accessibilityRole="button" onPress={onCancel} style={styles.closeButton}>
-            <Text style={styles.closeText}>閉じる</Text>
-          </Pressable>
-        </View>
+  if (!visible) return null;
 
-        {!permission ? (
-          <View style={styles.permissionPanel}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={styles.permissionBody}>カメラの状態を確認しています...</Text>
+  return (
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{title}</Text>
+        <Pressable accessibilityRole="button" onPress={onCancel} style={styles.closeButton}>
+          <Text style={styles.closeText}>閉じる</Text>
+        </Pressable>
+      </View>
+
+      {!permission ? (
+        <View style={styles.permissionPanel}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={styles.permissionBody}>カメラの状態を確認しています...</Text>
+        </View>
+      ) : !permissionGranted ? (
+        <View style={styles.permissionPanel}>
+          <Text style={styles.permissionTitle}>カメラの許可が必要です</Text>
+          <Text style={styles.permissionBody}>
+            グッズや取引の画像を撮影するため、カメラへのアクセスを許可してください。
+          </Text>
+          <AppButton label="カメラを許可する" onPress={askPermission} />
+        </View>
+      ) : capturedPhoto ? (
+        <View style={styles.previewWrap}>
+          <Image source={{ uri: capturedPhoto.uri }} resizeMode="contain" style={styles.previewImage} />
+          <View style={styles.previewActions}>
+            <AppButton label="撮り直す" variant="secondary" onPress={retakePhoto} />
+            <AppButton label="この写真を使う" onPress={usePhoto} />
           </View>
-        ) : !permissionGranted ? (
-          <View style={styles.permissionPanel}>
-            <Text style={styles.permissionTitle}>カメラの許可が必要です</Text>
-            <Text style={styles.permissionBody}>
-              グッズや取引の画像を撮影するため、カメラへのアクセスを許可してください。
-            </Text>
-            <AppButton label="カメラを許可する" onPress={askPermission} />
+        </View>
+      ) : (
+        <View style={styles.cameraWrap}>
+          <CameraView
+            active={visible && !capturedPhoto}
+            facing={facing}
+            mode="picture"
+            onCameraReady={() => setCameraReady(true)}
+            onMountError={(event) => {
+              Alert.alert('カメラを起動できません', event.message);
+            }}
+            ref={cameraRef}
+            style={StyleSheet.absoluteFill}
+          />
+          <View pointerEvents="none" style={styles.frameGuide} />
+          <View style={styles.cameraControls}>
+            <AppButton label="カメラ切替" variant="secondary" disabled={capturing} onPress={toggleFacing} />
+            <Pressable
+              accessibilityRole="button"
+              disabled={capturing || !cameraReady}
+              onPress={capturePhoto}
+              style={({ pressed }) => [
+                styles.shutterButton,
+                pressed && !capturing ? styles.shutterPressed : null,
+                capturing || !cameraReady ? styles.shutterDisabled : null,
+              ]}
+            >
+              {capturing ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.shutterText}>撮影</Text>}
+            </Pressable>
           </View>
-        ) : capturedPhoto ? (
-          <View style={styles.previewWrap}>
-            <Image source={{ uri: capturedPhoto.uri }} resizeMode="contain" style={styles.previewImage} />
-            <View style={styles.previewActions}>
-              <AppButton label="撮り直す" variant="secondary" onPress={retakePhoto} />
-              <AppButton label="この写真を使う" onPress={usePhoto} />
-            </View>
-          </View>
-        ) : (
-          <View style={styles.cameraWrap}>
-            <CameraView
-              active={visible && !capturedPhoto}
-              facing={facing}
-              mode="picture"
-              onCameraReady={() => setCameraReady(true)}
-              onMountError={(event) => {
-                Alert.alert('カメラを起動できません', event.message);
-              }}
-              ref={cameraRef}
-              style={StyleSheet.absoluteFill}
-            />
-            <View pointerEvents="none" style={styles.frameGuide} />
-            <View style={styles.cameraControls}>
-              <AppButton label="カメラ切替" variant="secondary" disabled={capturing} onPress={toggleFacing} />
-              <Pressable
-                accessibilityRole="button"
-                disabled={capturing || !cameraReady}
-                onPress={capturePhoto}
-                style={({ pressed }) => [
-                  styles.shutterButton,
-                  pressed && !capturing ? styles.shutterPressed : null,
-                  capturing || !cameraReady ? styles.shutterDisabled : null,
-                ]}
-              >
-                {capturing ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.shutterText}>撮影</Text>}
-              </Pressable>
-            </View>
-          </View>
-        )}
-      </SafeAreaView>
-    </Modal>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
 

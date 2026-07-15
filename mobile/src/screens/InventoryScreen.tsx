@@ -316,80 +316,83 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
           setModalVisible(false);
         }}
       >
-        <ScrollView contentContainerStyle={styles.modalContent}>
-          <Text style={styles.modalTitle}>{editingItem ? '在庫を編集' : '在庫を追加'}</Text>
-          <TextField label="グッズ種類" value={type} onChangeText={setType} placeholder="例：缶バッジ" />
-          <TextField label="品名・絵柄" value={name} onChangeText={setName} placeholder="例：A柄 / 通常版" />
-          <View style={styles.stepperField}>
-            <Text style={styles.stepperLabel}>実数</Text>
-            {editingItem ? (
-              <Text style={styles.plannedHint}>
-                予定数: {editingItem.planned_count ?? editingItem.count ?? 0}
-              </Text>
-            ) : null}
-            <QuantityStepper value={count} onChange={setCount} />
-          </View>
+        {cameraVisible ? (
+          <CameraCaptureModal
+            visible={cameraVisible}
+            title="グッズ画像を撮影"
+            onCancel={() => setCameraVisible(false)}
+            onUsePhoto={applyCapturedPhoto}
+          />
+        ) : (
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <Text style={styles.modalTitle}>{editingItem ? '在庫を編集' : '在庫を追加'}</Text>
+            <TextField label="グッズ種類" value={type} onChangeText={setType} placeholder="例：缶バッジ" />
+            <TextField label="品名・絵柄" value={name} onChangeText={setName} placeholder="例：A柄 / 通常版" />
+            <View style={styles.stepperField}>
+              <Text style={styles.stepperLabel}>実数</Text>
+              {editingItem ? (
+                <Text style={styles.plannedHint}>
+                  予定数: {editingItem.planned_count ?? editingItem.count ?? 0}
+                </Text>
+              ) : null}
+              <QuantityStepper value={count} onChange={setCount} />
+            </View>
 
-          <View style={styles.imageEditBox}>
-            <Text style={styles.stepperLabel}>グッズ画像</Text>
-            {currentEditImageUri ? (
-              <Pressable
-                accessibilityRole="imagebutton"
-                onPress={() => setPreviewImage({ uri: currentEditImageUri, title: 'グッズ画像' })}
-              >
-                <Image source={{ uri: currentEditImageUri }} style={styles.previewImage} />
-              </Pressable>
-            ) : (
-              <View style={styles.previewPlaceholder}>
-                <Text style={styles.imagePlaceholderText}>画像なし</Text>
+            <View style={styles.imageEditBox}>
+              <Text style={styles.stepperLabel}>グッズ画像</Text>
+              {currentEditImageUri ? (
+                <Pressable
+                  accessibilityRole="imagebutton"
+                  onPress={() => setPreviewImage({ uri: currentEditImageUri, title: 'グッズ画像' })}
+                >
+                  <Image source={{ uri: currentEditImageUri }} style={styles.previewImage} />
+                </Pressable>
+              ) : (
+                <View style={styles.previewPlaceholder}>
+                  <Text style={styles.imagePlaceholderText}>画像なし</Text>
+                </View>
+              )}
+              {uploadingImage ? (
+                <View style={styles.uploadNotice}>
+                  <ActivityIndicator color={colors.primary} size="small" />
+                  <Text style={styles.uploadNoticeText}>画像をアップロード中...</Text>
+                </View>
+              ) : null}
+              <View style={styles.rowActions}>
+                <AppButton label="画像を選ぶ" variant="secondary" disabled={saving} onPress={pickImage} />
+                <AppButton label="撮影する" variant="secondary" disabled={saving} onPress={takePhoto} />
+                <AppButton
+                  label="画像を外す"
+                  variant="ghost"
+                  disabled={saving || !currentEditImageUri}
+                  onPress={confirmRemoveImage}
+                />
               </View>
-            )}
-            {uploadingImage ? (
-              <View style={styles.uploadNotice}>
-                <ActivityIndicator color={colors.primary} size="small" />
-                <Text style={styles.uploadNoticeText}>画像をアップロード中...</Text>
-              </View>
-            ) : null}
-            <View style={styles.rowActions}>
-              <AppButton label="画像を選ぶ" variant="secondary" disabled={saving} onPress={pickImage} />
-              <AppButton label="撮影する" variant="secondary" disabled={saving} onPress={takePhoto} />
+            </View>
+
+            <View style={styles.modalActions}>
               <AppButton
-                label="画像を外す"
+                label="キャンセル"
                 variant="ghost"
-                disabled={saving || !currentEditImageUri}
-                onPress={confirmRemoveImage}
+                disabled={saving}
+                onPress={() => {
+                  setCameraVisible(false);
+                  setModalVisible(false);
+                }}
+              />
+              <AppButton
+                label={uploadingImage ? '画像アップロード中...' : saving ? '保存中...' : '保存する'}
+                disabled={saving}
+                onPress={saveItem}
               />
             </View>
-          </View>
-
-          <View style={styles.modalActions}>
-            <AppButton
-              label="キャンセル"
-              variant="ghost"
-              disabled={saving}
-              onPress={() => {
-                setCameraVisible(false);
-                setModalVisible(false);
-              }}
-            />
-            <AppButton
-              label={uploadingImage ? '画像アップロード中...' : saving ? '保存中...' : '保存する'}
-              disabled={saving}
-              onPress={saveItem}
-            />
-          </View>
-        </ScrollView>
+          </ScrollView>
+        )}
       </Modal>
       <ImagePreviewModal
         uri={previewImage?.uri ?? null}
         title={previewImage?.title}
         onClose={() => setPreviewImage(null)}
-      />
-      <CameraCaptureModal
-        visible={cameraVisible}
-        title="グッズ画像を撮影"
-        onCancel={() => setCameraVisible(false)}
-        onUsePhoto={applyCapturedPhoto}
       />
     </View>
   );
