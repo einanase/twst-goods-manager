@@ -5,11 +5,13 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type AlertButton,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { AppButton } from '../components/AppButton';
@@ -32,6 +34,12 @@ type ImagePreview = {
   title: string;
 } | null;
 
+type ConfirmDialogState = {
+  title: string;
+  message: string;
+  actions: AlertButton[];
+} | null;
+
 export function InventoryScreen({ userId }: InventoryScreenProps) {
   const [items, setItems] = useState<GoodsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +56,25 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   const [previewImage, setPreviewImage] = useState<ImagePreview>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [cameraVisible, setCameraVisible] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+
+  function showNotice(title: string, message: string) {
+    if (Platform.OS === 'web') {
+      setConfirmDialog({ title, message, actions: [{ text: 'OK', style: 'cancel' }] });
+      return;
+    }
+
+    Alert.alert(title, message);
+  }
+
+  function confirmAction(title: string, message: string, actions: AlertButton[]) {
+    if (Platform.OS === 'web') {
+      setConfirmDialog({ title, message, actions });
+      return;
+    }
+
+    Alert.alert(title, message, actions);
+  }
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -99,7 +126,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   async function pickImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('画像を選べません', '写真へのアクセスを許可してください。');
+      showNotice('画像を選べません', '写真へのアクセスを許可してください。');
       return;
     }
 
@@ -113,7 +140,30 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
     }
   }
 
-  function takePhoto() {
+  async function takePhoto() {
+    if (Platform.OS === 'web') {
+      try {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          showNotice('カメラを使えません', 'Safariの設定からカメラへのアクセスを許可してください。');
+          return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+          allowsEditing: false,
+          quality: 0.82,
+        });
+
+        if (!result.canceled) {
+          applyPickedImage(result.assets[0]);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        showNotice('カメラを開けません', `Safariで撮影を開始できませんでした。画像を選ぶボタンも試してください。\n\n${message}`);
+      }
+      return;
+    }
+
     setCameraVisible(true);
   }
 
@@ -136,7 +186,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
 
   function confirmRemoveImage() {
     if (!currentEditImageUri) return;
-    Alert.alert('画像を外しますか？', '保存するまで変更は確定しません。', [
+    confirmAction('画像を外しますか？', '保存するまで変更は確定しません。', [
       { text: 'キャンセル', style: 'cancel' },
       {
         text: '外す',
@@ -148,7 +198,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
 
   async function saveItem() {
     if (!type.trim() || !name.trim()) {
-      Alert.alert('入力不足', 'グッズ種類と品名・絵柄を入力してください。');
+      showNotice('入力不足', 'グッズ種類と品名・絵柄を入力してください。');
       return;
     }
 
@@ -218,7 +268,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   }
 
   async function confirmDelete(item: GoodsItem) {
-    Alert.alert('削除しますか？', `${item.type} / ${item.char} を削除します。`, [
+    confirmAction('削除しますか？', `${item.type} / ${item.char} を削除します。`, [
       { text: 'キャンセル', style: 'cancel' },
       {
         text: '削除する',
@@ -394,7 +444,54 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         title={previewImage?.title}
         onClose={() => setPreviewImage(null)}
       />
+      <ConfirmDialog dialog={confirmDialog} onClose={() => setConfirmDialog(null)} />
     </View>
+  );
+}
+
+function ConfirmDialog({
+  dialog,
+  onClose,
+}: {
+  dialog: ConfirmDialogState;
+  onClose: () => void;
+}) {
+  if (!dialog) return null;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.confirmOverlay}>
+        <View style={styles.confirmPanel}>
+          <Text style={styles.confirmTitle}>{dialog.title}</Text>
+          <ScrollView style={styles.confirmMessageScroll} contentContainerStyle={styles.confirmMessageContent}>
+            <Text style={styles.confirmMessage}>{dialog.message}</Text>
+          </ScrollView>
+          <View style={styles.confirmActions}>
+            {dialog.actions.map((action, index) => {
+              const label = action.text ?? 'OK';
+              const variant =
+                action.style === 'destructive'
+                  ? 'danger'
+                  : action.style === 'cancel'
+                    ? 'cancel'
+                    : 'primary';
+
+              return (
+                <AppButton
+                  key={`${label}-${index}`}
+                  label={label}
+                  variant={variant}
+                  onPress={() => {
+                    onClose();
+                    action.onPress?.();
+                  }}
+                />
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -501,6 +598,46 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     fontWeight: '800',
+  },
+  confirmOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 18,
+  },
+  confirmPanel: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 14,
+    maxHeight: '86%',
+    maxWidth: 480,
+    padding: 16,
+    width: '100%',
+  },
+  confirmTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  confirmMessageScroll: {
+    maxHeight: 360,
+  },
+  confirmMessageContent: {
+    paddingBottom: 4,
+  },
+  confirmMessage: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: colors.background,

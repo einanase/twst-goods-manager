@@ -1,11 +1,11 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, type GestureResponderEvent } from 'react-native';
 import { colors } from '../lib/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'cancel';
 
 type AppButtonProps = {
   label: string;
-  onPress: () => void;
+  onPress: (event: GestureResponderEvent) => void;
   variant?: ButtonVariant;
   disabled?: boolean;
 };
@@ -31,7 +31,10 @@ export function AppButton({ label, onPress, variant = 'primary', disabled = fals
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
-      onPress={onPress}
+      onPress={(event) => {
+        event.stopPropagation();
+        onPress(event);
+      }}
       style={({ pressed }) => [
         styles.button,
         buttonStyleByVariant[variant],

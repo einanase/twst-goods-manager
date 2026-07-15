@@ -203,7 +203,30 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     }
   }
 
-  function takePhoto() {
+  async function takePhoto() {
+    if (Platform.OS === 'web') {
+      try {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          showNotice('カメラを使えません', 'Safariの設定からカメラへのアクセスを許可してください。');
+          return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+          allowsEditing: false,
+          quality: 0.82,
+        });
+
+        if (!result.canceled) {
+          applyPickedImage(result.assets[0]);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        showNotice('カメラを開けません', `Safariで撮影を開始できませんでした。画像を選ぶボタンも試してください。\n\n${message}`);
+      }
+      return;
+    }
+
     setCameraVisible(true);
   }
 
@@ -588,39 +611,41 @@ export function TradesScreen({ userId }: TradesScreenProps) {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.toolbar}>
-        <TextField label="相手で検索" value={search} onChangeText={setSearch} placeholder="@username" />
-        <TextField label="メモで検索" value={memoSearch} onChangeText={setMemoSearch} placeholder="発送方法など" />
-        <View style={styles.filterRow}>
-          {(['all', ...statuses] as Array<'all' | TradeStatus>).map((candidate) => (
-            <Pressable
-              key={candidate}
-              onPress={() => setStatusFilter(candidate)}
-              style={[
-                styles.filterChip,
-                statusFilter === candidate ? styles.filterChipActive : null,
-              ]}
-            >
-              <Text style={[styles.filterChipText, statusFilter === candidate ? styles.filterChipTextActive : null]}>
-                {candidate === 'all' ? 'すべて' : candidate}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <AppButton label="取引を追加" onPress={openCreate} />
-      </View>
-
-      {loading ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
-      ) : (
-        <FlatList
-          contentContainerStyle={styles.listContent}
-          data={filteredTrades}
-          keyExtractor={(item) => String(item.id)}
-          ListEmptyComponent={
+      <FlatList
+        contentContainerStyle={styles.listContent}
+        data={loading ? [] : filteredTrades}
+        keyExtractor={(item) => String(item.id)}
+        ListHeaderComponent={
+          <View style={styles.toolbar}>
+            <TextField label="相手で検索" value={search} onChangeText={setSearch} placeholder="@username" />
+            <TextField label="メモで検索" value={memoSearch} onChangeText={setMemoSearch} placeholder="発送方法など" />
+            <View style={styles.filterRow}>
+              {(['all', ...statuses] as Array<'all' | TradeStatus>).map((candidate) => (
+                <Pressable
+                  key={candidate}
+                  onPress={() => setStatusFilter(candidate)}
+                  style={[
+                    styles.filterChip,
+                    statusFilter === candidate ? styles.filterChipActive : null,
+                  ]}
+                >
+                  <Text style={[styles.filterChipText, statusFilter === candidate ? styles.filterChipTextActive : null]}>
+                    {candidate === 'all' ? 'すべて' : candidate}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <AppButton label="取引を追加" onPress={openCreate} />
+          </View>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator color={colors.primary} style={styles.loader} />
+          ) : (
             <EmptyState title="取引がありません" body="取引相手、渡すもの、受けるもの、発送状況を記録できます。" />
-          }
-          renderItem={({ item, index }) => (
+          )
+        }
+        renderItem={({ item, index }) => (
             <Pressable style={styles.card} onPress={() => openEdit(item)}>
               <View style={styles.cardTop}>
                 <View style={styles.tradeTitleBlock}>
@@ -634,7 +659,10 @@ export function TradesScreen({ userId }: TradesScreenProps) {
                 {statuses.map((candidate) => (
                   <Pressable
                     key={candidate}
-                    onPress={() => updateStatus(item, candidate)}
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      updateStatus(item, candidate);
+                    }}
                     style={[styles.statusChip, item.status === candidate ? styles.statusChipActive : null]}
                   >
                     <Text style={[styles.statusChipText, item.status === candidate ? styles.statusChipTextActive : null]}>
@@ -692,9 +720,8 @@ export function TradesScreen({ userId }: TradesScreenProps) {
 
               {item.memo ? <Text style={styles.memo}>{item.memo}</Text> : null}
             </Pressable>
-          )}
-        />
-      )}
+        )}
+      />
 
       <Modal
         animationType="slide"
@@ -1113,7 +1140,10 @@ function ProgressPill({
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
-      onPress={onPress}
+      onPress={(event) => {
+        event.stopPropagation();
+        onPress();
+      }}
       style={[
         styles.progressPillButton,
         done ? styles.progressPillDone : null,
@@ -1410,7 +1440,33 @@ async function syncStockAfterTradeChange(
     }
   };
 
-  const updateActual = (itemId: RowId, delta: number) => {
+  const addActualDelta = (itemId: RowId, delta: number) => {
+    const sid = String(itemId);
+    actualDeltas.set(sid, (actualDeltas.get(sid) ?? 0) + delta);
+    affectedItemIds.add(sid);
+  };
+
+  const addTradeImpact = (trade: Trade | null, direction: 1 | -1) => {
+    if (!trade) return;
+
+    if (trade.is_sent) {
+      for (const item of trade.give_items ?? []) {
+        addActualDelta(item.id, -item.count * direction);
+      }
+    }
+
+    if (trade.is_received) {
+      for (const item of trade.receive_items ?? []) {
+        addActualDelta(item.id, item.count * direction);
+      }
+    }
+  };
+
+  const actualDeltas = new Map<string, number>();
+  addTradeImpact(oldTrade, -1);
+  addTradeImpact(newTrade, 1);
+
+  const updateActual = (itemId: string, delta: number) => {
     const sid = String(itemId);
     const index = nextGoods.findIndex((item) => String(item.id) === sid);
     if (index < 0) return;
@@ -1422,22 +1478,10 @@ async function syncStockAfterTradeChange(
     affectedItemIds.add(sid);
   };
 
-  if (!oldTrade?.is_sent && newTrade?.is_sent) {
-    for (const item of newTrade.give_items ?? []) updateActual(item.id, -item.count);
-  } else if (oldTrade?.is_sent && !newTrade?.is_sent) {
-    for (const item of oldTrade.give_items ?? []) updateActual(item.id, item.count);
-  } else if (oldTrade?.is_sent && newTrade?.is_sent) {
-    for (const item of oldTrade.give_items ?? []) updateActual(item.id, item.count);
-    for (const item of newTrade.give_items ?? []) updateActual(item.id, -item.count);
-  }
-
-  if (!oldTrade?.is_received && newTrade?.is_received) {
-    for (const item of newTrade.receive_items ?? []) updateActual(item.id, item.count);
-  } else if (oldTrade?.is_received && !newTrade?.is_received) {
-    for (const item of oldTrade.receive_items ?? []) updateActual(item.id, -item.count);
-  } else if (oldTrade?.is_received && newTrade?.is_received) {
-    for (const item of oldTrade.receive_items ?? []) updateActual(item.id, -item.count);
-    for (const item of newTrade.receive_items ?? []) updateActual(item.id, item.count);
+  for (const [itemId, delta] of actualDeltas) {
+    if (delta !== 0) {
+      updateActual(itemId, delta);
+    }
   }
 
   addAffectedItems(oldTrade);
@@ -1483,7 +1527,6 @@ const styles = StyleSheet.create({
   },
   toolbar: {
     gap: 10,
-    padding: 16,
   },
   filterRow: {
     flexDirection: 'row',
@@ -1516,7 +1559,6 @@ const styles = StyleSheet.create({
   listContent: {
     gap: 12,
     padding: 16,
-    paddingTop: 0,
   },
   card: {
     backgroundColor: colors.surface,
