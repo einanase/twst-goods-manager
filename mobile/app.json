@@ -28,7 +28,10 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/app/adaptive-icon.png",
         "backgroundColor": "#F8FFFD"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "favicon": "./assets/app/icon.png"
@@ -49,6 +52,12 @@
           "recordAudioAndroid": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a522c43f-55d3-49da-aac2-ec891b74ce02"
+      }
+    },
+    "owner": "einanase"
   }
 }

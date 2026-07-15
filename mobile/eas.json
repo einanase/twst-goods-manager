@@ -1,4 +1,7 @@
 {
+  "cli": {
+    "version": "21.0.1"
+  },
   "build": {
     "preview": {
       "distribution": "internal",
