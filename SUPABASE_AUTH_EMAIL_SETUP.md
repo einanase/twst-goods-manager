@@ -1,7 +1,7 @@
 # Supabase Auth email setup
 
 Supabase の初期メールは `Confirm Your Signup` / `Confirm your signup` のような汎用文面です。
-販売・テスト運用では、利用者が「グッズ交換管理の認証メールだ」と分かるように件名と本文を変更してください。
+販売・テスト運用では、利用者が「グッとれの認証メールだ」と分かるように件名と本文を変更してください。
 
 ## 1. モバイル版の戻り先URLを設定する
 
@@ -16,13 +16,13 @@ React Native / Expo 版では、確認メールの戻り先にアプリ用 deep 
 `Site URL`:
 
 ```text
-goodstrade://auth/callback
+guttore://auth/callback
 ```
 
 `Redirect URLs`:
 
 ```text
-goodstrade://auth/callback
+guttore://auth/callback
 ```
 
 Expo Goでテストしている間だけ、`Redirect URLs` に以下も追加します。
@@ -47,15 +47,15 @@ Supabase Dashboard で以下を開きます。
 Subject の例:
 
 ```text
-グッズ交換管理のメール確認
+グッとれのメール確認
 ```
 
 Message body の例:
 
 ```html
-<h2>グッズ交換管理の登録確認</h2>
+<h2>グッとれの登録確認</h2>
 
-<p>グッズ交換管理への登録ありがとうございます。</p>
+<p>グッズ交換在庫管理アプリ「グッとれ」への登録ありがとうございます。</p>
 
 <p>下のボタンを押して、メールアドレスの確認を完了してください。</p>
 
@@ -71,7 +71,7 @@ Message body の例:
 ## 3. Web版で確認後に古い画面へ戻らないようにする
 
 Web版を使う場合は、`Site URL` と `Redirect URLs` に最新版WebアプリのURLを入れてください。
-古い `Twst Goods Manager` のURLが残っていると、確認メールを押した後に古い画面へ戻ることがあります。
+古いWeb版のURLが残っていると、確認メールを押した後に古い画面へ戻ることがあります。
 
 ## 4. 画像が見えないとき
 

@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "グッズ交換管理",
-    "slug": "goods-trade-manager",
-    "scheme": "goodstrade",
+    "name": "グッとれ",
+    "slug": "guttore",
+    "scheme": "guttore",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.example.goodstrademanager",
+      "bundleIdentifier": "jp.guttore.app",
       "infoPlist": {
         "CFBundleDevelopmentRegion": "ja",
         "CFBundleLocalizations": [
@@ -17,7 +17,7 @@
       }
     },
     "android": {
-      "package": "com.example.goodstrademanager"
+      "package": "jp.guttore.app"
     },
     "plugins": [
       [

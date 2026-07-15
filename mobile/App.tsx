@@ -10,6 +10,7 @@ import { TradesScreen } from './src/screens/TradesScreen';
 import { getSupabase } from './src/lib/supabase';
 import { hasSupabaseConfig } from './src/lib/env';
 import { colors } from './src/lib/theme';
+import { appBrand } from './src/lib/brand';
 
 type MainTab = 'inventory' | 'trades';
 
@@ -75,7 +76,8 @@ export default function App() {
       <StatusBar style="dark" />
       <View style={styles.header}>
         <View style={styles.headerTextBlock}>
-          <Text style={styles.appName}>グッズ交換管理</Text>
+          <Text style={styles.appName}>{appBrand.name}</Text>
+          <Text style={styles.subtitleText}>{appBrand.subtitle}</Text>
           <Text style={styles.userText} numberOfLines={1}>
             {email}
           </Text>
@@ -135,6 +137,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
   },
+  subtitleText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 2,
+  },
   userText: {
     color: colors.muted,
     fontSize: 12,
@@ -147,4 +155,3 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
 });
-

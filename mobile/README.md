@@ -1,6 +1,7 @@
-# グッズ交換管理 Mobile
+# グッとれ Mobile
 
-React Native / Expo で作るスマホアプリ版です。
+グッズ交換在庫管理アプリ「グッとれ」のReact Native / Expo版です。
+
 既存のWeb版は残し、この `mobile` フォルダを別プロジェクトとして育てます。
 
 ## いま入っているもの
@@ -97,11 +98,11 @@ React Native / Expo で作るスマホアプリ版です。
 
 ## 新規登録メールのリンク設定
 
-React Native版では、確認メールの戻り先として `goodstrade://auth/callback` を使います。
+React Native版では、確認メールの戻り先として `guttore://auth/callback` を使います。
 Supabase Dashboard で次を追加してください。
 
 1. Authentication -> URL Configuration を開く
-2. Redirect URLs に `goodstrade://auth/callback` を追加する
+2. Redirect URLs に `guttore://auth/callback` を追加する
 3. Save する
 
 Web版のSite URLは、今まで通りGitHub PagesのURLで大丈夫です。

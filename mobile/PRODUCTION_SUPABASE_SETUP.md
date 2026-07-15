@@ -15,7 +15,7 @@ X ID、取引画像、メモ、発送予定などは個人情報に近い情報�
 1. Supabase Dashboardを開きます。
 2. 左上の組織が正しいことを確認します。
 3. `New project` を押します。
-4. 名前は例として `goods-trade-manager-production` にします。
+4. 名前は例として `guttore-production` にします。
 5. Database Passwordを設定します。これは後で必要になる可能性があるので控えておきます。
 6. Regionは主な利用者に近い場所を選びます。
 7. `Create new project` を押し、作成完了まで待ちます。
@@ -78,10 +78,10 @@ Authenticationの設定で以下を行います。
 4. `Redirect URLs` に次を追加します。
 
 ```text
-goodstrade://auth/callback
+guttore://auth/callback
 ```
 
-5. 新規登録メールの件名と本文を、アプリ名が分かる内容に変更します。
+5. 新規登録メールの件名と本文を、`グッとれ` の登録メールだと分かる内容に変更します。
 
 本番ビルド後は、必要に応じてApp Store / Google Play用のdeep linkやWeb fallback URLも追加します。
 

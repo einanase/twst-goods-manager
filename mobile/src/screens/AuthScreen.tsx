@@ -6,6 +6,7 @@ import { AppButton } from '../components/AppButton';
 import { TextField } from '../components/TextField';
 import { getSupabase } from '../lib/supabase';
 import { colors } from '../lib/theme';
+import { appBrand } from '../lib/brand';
 
 type AuthMode = 'login' | 'signup';
 
@@ -71,11 +72,15 @@ export function AuthScreen() {
         style={styles.keyboardWrap}
       >
         <View style={styles.panel}>
+          <View style={styles.brandBlock}>
+            <Text style={styles.brandName}>{appBrand.name}</Text>
+            <Text style={styles.brandSubtitle}>{appBrand.subtitle}</Text>
+          </View>
           <Text style={styles.title}>{isSignup ? '新規登録' : 'ログイン'}</Text>
           <Text style={styles.lead}>
             {isSignup
               ? '新しいメールアドレスでアカウントを作成します。'
-              : 'クラウド同期を使うため、サインインしてください。'}
+              : '在庫と取引をクラウド同期するため、サインインしてください。'}
           </Text>
 
           <View style={styles.form}>
@@ -144,6 +149,20 @@ const styles = StyleSheet.create({
     gap: 18,
     padding: 20,
   },
+  brandBlock: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  brandName: {
+    color: colors.text,
+    fontSize: 30,
+    fontWeight: '900',
+  },
+  brandSubtitle: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   title: {
     color: colors.text,
     fontSize: 24,
@@ -163,4 +182,3 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 });
-
