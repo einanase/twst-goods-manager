@@ -20,7 +20,8 @@
         "CFBundleDevelopmentRegion": "ja",
         "CFBundleLocalizations": [
           "ja"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
