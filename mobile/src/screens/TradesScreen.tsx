@@ -674,8 +674,9 @@ export function TradesScreen({ userId }: TradesScreenProps) {
       )}
 
       <Modal animationType="slide" visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-        <ScrollView contentContainerStyle={styles.modalContent}>
-          <Text style={styles.modalTitle}>{editingTrade ? '取引を編集' : '取引を追加'}</Text>
+        <View style={styles.modalRoot}>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <Text style={styles.modalTitle}>{editingTrade ? '取引を編集' : '取引を追加'}</Text>
 
           <View style={styles.formStepTabs}>
             {tradeFormSteps.map((step) => {
@@ -838,28 +839,29 @@ export function TradesScreen({ userId }: TradesScreenProps) {
               onPress={saveTrade}
             />
           </View>
-        </ScrollView>
+          </ScrollView>
+          <CalendarPickerModal
+            visible={calendarTarget !== null}
+            title={calendarTarget === 'ship' ? '発送予定日を選択' : '受取予定日を選択'}
+            value={calendarTarget === 'ship' ? shipDate : receiveDate}
+            onClose={() => setCalendarTarget(null)}
+            onClear={() => {
+              if (calendarTarget === 'ship') setShipDate('');
+              if (calendarTarget === 'receive') setReceiveDate('');
+              setCalendarTarget(null);
+            }}
+            onSelect={(date) => {
+              if (calendarTarget === 'ship') setShipDate(date);
+              if (calendarTarget === 'receive') setReceiveDate(date);
+              setCalendarTarget(null);
+            }}
+          />
+        </View>
       </Modal>
       <ImagePreviewModal
         uri={previewImage?.uri ?? null}
         title={previewImage?.title}
         onClose={() => setPreviewImage(null)}
-      />
-      <CalendarPickerModal
-        visible={calendarTarget !== null}
-        title={calendarTarget === 'ship' ? '発送予定日を選択' : '受取予定日を選択'}
-        value={calendarTarget === 'ship' ? shipDate : receiveDate}
-        onClose={() => setCalendarTarget(null)}
-        onClear={() => {
-          if (calendarTarget === 'ship') setShipDate('');
-          if (calendarTarget === 'receive') setReceiveDate('');
-          setCalendarTarget(null);
-        }}
-        onSelect={(date) => {
-          if (calendarTarget === 'ship') setShipDate(date);
-          if (calendarTarget === 'receive') setReceiveDate(date);
-          setCalendarTarget(null);
-        }}
       />
     </View>
   );
@@ -952,51 +954,51 @@ function CalendarPickerModal({
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + diff, 1));
   }
 
-  return (
-    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
-      <View style={styles.calendarOverlay}>
-        <View style={styles.calendarPanel}>
-          <Text style={styles.calendarTitle}>{title}</Text>
-          <View style={styles.calendarHeader}>
-            <AppButton label="前月" variant="ghost" onPress={() => moveMonth(-1)} />
-            <Text style={styles.calendarMonthText}>{year}年 {month + 1}月</Text>
-            <AppButton label="翌月" variant="ghost" onPress={() => moveMonth(1)} />
-          </View>
-          <View style={styles.weekdayRow}>
-            {calendarWeekdays.map((weekday) => (
-              <Text key={weekday} style={styles.weekdayText}>{weekday}</Text>
-            ))}
-          </View>
-          <View style={styles.calendarGrid}>
-            {days.map((date, index) => {
-              if (!date) {
-                return <View key={`empty-${index}`} style={styles.calendarDayPlaceholder} />;
-              }
+  if (!visible) return null;
 
-              const dateValue = formatDateValue(date);
-              const selected = value === dateValue;
-              return (
-                <Pressable
-                  key={dateValue}
-                  accessibilityRole="button"
-                  onPress={() => onSelect(dateValue)}
-                  style={[styles.calendarDayButton, selected ? styles.calendarDaySelected : null]}
-                >
-                  <Text style={[styles.calendarDayText, selected ? styles.calendarDayTextSelected : null]}>
-                    {date.getDate()}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <View style={styles.calendarActions}>
-            <AppButton label="閉じる" variant="cancel" onPress={onClose} />
-            <AppButton label="日付を消す" variant="ghost" onPress={onClear} />
-            <AppButton label="今日" variant="secondary" onPress={() => onSelect(formatDateValue(new Date()))} />
-          </View>
+  return (
+    <View style={styles.calendarOverlay}>
+      <View style={styles.calendarPanel}>
+        <Text style={styles.calendarTitle}>{title}</Text>
+        <View style={styles.calendarHeader}>
+          <AppButton label="前月" variant="ghost" onPress={() => moveMonth(-1)} />
+          <Text style={styles.calendarMonthText}>{year}年 {month + 1}月</Text>
+          <AppButton label="翌月" variant="ghost" onPress={() => moveMonth(1)} />
+        </View>
+        <View style={styles.weekdayRow}>
+          {calendarWeekdays.map((weekday) => (
+            <Text key={weekday} style={styles.weekdayText}>{weekday}</Text>
+          ))}
+        </View>
+        <View style={styles.calendarGrid}>
+          {days.map((date, index) => {
+            if (!date) {
+              return <View key={`empty-${index}`} style={styles.calendarDayPlaceholder} />;
+            }
+
+            const dateValue = formatDateValue(date);
+            const selected = value === dateValue;
+            return (
+              <Pressable
+                key={dateValue}
+                accessibilityRole="button"
+                onPress={() => onSelect(dateValue)}
+                style={[styles.calendarDayButton, selected ? styles.calendarDaySelected : null]}
+              >
+                <Text style={[styles.calendarDayText, selected ? styles.calendarDayTextSelected : null]}>
+                  {date.getDate()}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={styles.calendarActions}>
+          <AppButton label="閉じる" variant="cancel" onPress={onClose} />
+          <AppButton label="日付を消す" variant="ghost" onPress={onClear} />
+          <AppButton label="今日" variant="secondary" onPress={() => onSelect(formatDateValue(new Date()))} />
         </View>
       </View>
-    </Modal>
+    </View>
   );
 }
 
@@ -1557,6 +1559,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
+  modalRoot: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
   modalContent: {
     backgroundColor: colors.background,
     gap: 16,
@@ -1691,8 +1697,8 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   calendarOverlay: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15, 23, 42, 0.42)',
-    flex: 1,
     justifyContent: 'center',
     padding: 18,
   },
