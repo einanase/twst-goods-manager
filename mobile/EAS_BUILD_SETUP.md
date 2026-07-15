@@ -20,7 +20,7 @@ PowerShellで次を実行します。
 
 ```powershell
 cd "D:\リポジトリ\在庫管理_codex\mobile"
-npx eas-cli login
+npm.cmd exec eas -- login
 ```
 
 Expoアカウントを持っていなければ、この前にExpoのアカウントを作ります。
@@ -33,10 +33,10 @@ EASのクラウドビルドでは、手元の `.env` は自動では使われま
 `<Project URL>` と `<publishable key>` を実際の値に置き換えて実行します。
 
 ```powershell
-npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_URL --value "<Project URL>" --environment preview --visibility plaintext
-npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value "<publishable key>" --environment preview --visibility plaintext
-npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_URL --value "<Project URL>" --environment production --visibility plaintext
-npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value "<publishable key>" --environment production --visibility plaintext
+npm.cmd exec eas -- env:create --name EXPO_PUBLIC_SUPABASE_URL --value "<Project URL>" --environment preview --visibility plaintext
+npm.cmd exec eas -- env:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value "<publishable key>" --environment preview --visibility plaintext
+npm.cmd exec eas -- env:create --name EXPO_PUBLIC_SUPABASE_URL --value "<Project URL>" --environment production --visibility plaintext
+npm.cmd exec eas -- env:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value "<publishable key>" --environment production --visibility plaintext
 ```
 
 `EXPO_PUBLIC_` で始まる値はアプリに埋め込まれる公開値です。Supabaseのpublishable/anon keyはこの用途のキーです。
