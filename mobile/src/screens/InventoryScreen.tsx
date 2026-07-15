@@ -20,10 +20,12 @@ import { EmptyState } from '../components/EmptyState';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { QuantityStepper } from '../components/QuantityStepper';
 import { TextField } from '../components/TextField';
+import { calculatePlannedStockCount } from '../lib/stockProjection';
 import { colors } from '../lib/theme';
 import type { GoodsItem } from '../types/domain';
-import { createGoods, deleteGoods, loadGoods, updateGoods, updateGoodsCount } from '../services/goodsService';
+import { createGoods, deleteGoods, loadGoods, updateGoods, updateGoodsStock } from '../services/goodsService';
 import { getStoredImageValue, removeStoredImage, uploadPrivateImageFromUri } from '../services/imageStorage';
+import { loadTrades } from '../services/tradeService';
 
 type InventoryScreenProps = {
   userId: string;
@@ -186,10 +188,10 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
 
   function confirmRemoveImage() {
     if (!currentEditImageUri) return;
-    confirmAction('画像を外しますか？', '保存するまで変更は確定しません。', [
+    confirmAction('画像を削除しますか？', '保存するまで変更は確定しません。', [
       { text: 'キャンセル', style: 'cancel' },
       {
-        text: '外す',
+        text: '削除する',
         style: 'destructive',
         onPress: clearImage,
       },
@@ -248,17 +250,29 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
 
   async function changeCount(item: GoodsItem, nextCount: number) {
     const previous = items;
+    const pendingDiff = (item.planned_count ?? item.count ?? 0) - (item.count ?? 0);
+    const optimisticPlannedCount = Math.max(0, nextCount + pendingDiff);
+
     setItems((current) =>
       current.map((candidate) =>
-        String(candidate.id) === String(item.id) ? { ...candidate, count: nextCount } : candidate,
+        String(candidate.id) === String(item.id)
+          ? { ...candidate, count: nextCount, planned_count: optimisticPlannedCount }
+          : candidate,
       ),
     );
 
     try {
-      const saved = await updateGoodsCount(userId, item.id, nextCount);
+      const trades = await loadTrades(userId);
+      const plannedCount = calculatePlannedStockCount(nextCount, item.id, trades);
+      await updateGoodsStock(userId, item.id, {
+        count: nextCount,
+        planned_count: plannedCount,
+      });
       setItems((current) =>
         current.map((candidate) =>
-          String(candidate.id) === String(item.id) ? saved : candidate,
+          String(candidate.id) === String(item.id)
+            ? { ...candidate, count: nextCount, planned_count: plannedCount }
+            : candidate,
         ),
       );
     } catch (error) {
@@ -412,7 +426,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
                 <AppButton label="画像を選ぶ" variant="secondary" disabled={saving} onPress={pickImage} />
                 <AppButton label="撮影する" variant="secondary" disabled={saving} onPress={takePhoto} />
                 <AppButton
-                  label="画像を外す"
+                  label="画像を削除"
                   variant="ghost"
                   disabled={saving || !currentEditImageUri}
                   onPress={confirmRemoveImage}

@@ -21,6 +21,7 @@ import { EmptyState } from '../components/EmptyState';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { QuantityStepper } from '../components/QuantityStepper';
 import { TextField } from '../components/TextField';
+import { calculatePlannedStockCount } from '../lib/stockProjection';
 import { colors } from '../lib/theme';
 import { loadGoods, updateGoodsStock } from '../services/goodsService';
 import { createTrade, deleteTrade, loadTrades, patchTrade, updateTrade } from '../services/tradeService';
@@ -249,10 +250,10 @@ export function TradesScreen({ userId }: TradesScreenProps) {
 
   function confirmRemoveImage() {
     if (!currentEditImageUri) return;
-    confirmAction('画像を外しますか？', '保存するまで変更は確定しません。', [
+    confirmAction('画像を削除しますか？', '保存するまで変更は確定しません。', [
       { text: 'キャンセル', style: 'cancel' },
       {
-        text: '外す',
+        text: '削除する',
         style: 'destructive',
         onPress: clearImage,
       },
@@ -876,7 +877,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
                     <AppButton label="画像を選ぶ" variant="secondary" disabled={saving} onPress={pickImage} />
                     <AppButton label="撮影する" variant="secondary" disabled={saving} onPress={takePhoto} />
                     <AppButton
-                      label="画像を外す"
+                      label="画像を削除"
                       variant="ghost"
                       disabled={saving || !currentEditImageUri}
                       onPress={confirmRemoveImage}
@@ -1494,7 +1495,7 @@ async function syncStockAfterTradeChange(
     const item = nextGoods[index];
     if (!item) continue;
     const actualCount = item?.count ?? 0;
-    const plannedCount = Math.max(0, actualCount + calculatePendingDiff(itemId, nextTrades));
+    const plannedCount = calculatePlannedStockCount(actualCount, itemId, nextTrades);
     nextGoods[index] = { ...item, planned_count: plannedCount };
     await updateGoodsStock(userId, item.id, {
       count: actualCount,
@@ -1503,22 +1504,6 @@ async function syncStockAfterTradeChange(
   }
 
   return nextGoods;
-}
-
-function calculatePendingDiff(itemId: string, trades: Trade[]) {
-  let pendingDiff = 0;
-
-  for (const trade of trades) {
-    if (trade.status !== '成約') continue;
-
-    const give = (trade.give_items ?? []).find((item) => String(item.id) === itemId);
-    if (give && !trade.is_sent) pendingDiff -= give.count;
-
-    const receive = (trade.receive_items ?? []).find((item) => String(item.id) === itemId);
-    if (receive && !trade.is_received) pendingDiff += receive.count;
-  }
-
-  return pendingDiff;
 }
 
 const styles = StyleSheet.create({
