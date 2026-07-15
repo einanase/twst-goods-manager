@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="520" viewBox="0 0 1600 520" role="img" aria-labelledby="title desc">
+  <title id="title">グッとれ ロゴ</title>
+  <desc id="desc">グッズ交換在庫管理アプリ「グッとれ」の横長ロゴ。</desc>
+  <defs>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#12312D" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="520" fill="none"/>
+
+  <g transform="translate(104 78)" filter="url(#softShadow)">
+    <rect x="0" y="0" width="364" height="364" rx="88" fill="#E8FAF6"/>
+    <rect x="42" y="42" width="280" height="280" rx="70" fill="#FFFFFF"/>
+
+    <g transform="translate(68 78)">
+      <rect x="116" y="4" width="112" height="132" rx="24" fill="#FF7A59"/>
+      <rect x="132" y="24" width="80" height="12" rx="6" fill="#FFFFFF" opacity="0.72"/>
+      <circle cx="151" cy="65" r="13" fill="#FFFFFF" opacity="0.84"/>
+      <circle cx="189" cy="65" r="13" fill="#FFFFFF" opacity="0.84"/>
+
+      <rect x="0" y="118" width="136" height="136" rx="28" fill="#22C7A9"/>
+      <rect x="22" y="142" width="92" height="15" rx="7.5" fill="#FFFFFF" opacity="0.78"/>
+      <rect x="22" y="175" width="64" height="15" rx="7.5" fill="#FFFFFF" opacity="0.62"/>
+
+      <path d="M41 83H185l-38-38" fill="none" stroke="#1F2A37" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M188 178H44l38 38" fill="none" stroke="#1F2A37" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+
+  <g transform="translate(544 126)">
+    <text x="0" y="130" font-family="M PLUS Rounded 1c, Noto Sans JP, Yu Gothic, sans-serif" font-size="136" font-weight="900" letter-spacing="0" fill="#1F2A37">
+      <tspan fill="#22A891">グッ</tspan><tspan>と</tspan><tspan fill="#F26445">れ</tspan>
+    </text>
+    <text x="9" y="205" font-family="Noto Sans JP, Yu Gothic, sans-serif" font-size="36" font-weight="700" letter-spacing="0" fill="#41515C">
+      グッズ交換在庫管理アプリ
+    </text>
+
+    <g transform="translate(12 246)">
+      <path d="M0 0H406" stroke="#22C7A9" stroke-width="14" stroke-linecap="round"/>
+      <path d="M377 -31L422 0L377 31" fill="none" stroke="#22C7A9" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="477" cy="0" r="16" fill="#FF7A59"/>
+      <circle cx="532" cy="0" r="16" fill="#1F2A37"/>
+    </g>
+  </g>
+</svg>
