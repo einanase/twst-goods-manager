@@ -5,12 +5,14 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   View,
+  type AlertButton,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { AppButton } from '../components/AppButton';
@@ -46,6 +48,11 @@ const calendarWeekdays = ['日', '月', '火', '水', '木', '金', '土'];
 
 type TradeFormStep = 'basic' | 'items' | 'progress' | 'notes';
 type CalendarTarget = 'ship' | 'receive' | null;
+type ConfirmDialogState = {
+  title: string;
+  message: string;
+  actions: AlertButton[];
+} | null;
 
 const tradeFormSteps: Array<{ key: TradeFormStep; label: string }> = [
   { key: 'basic', label: '基本' },
@@ -85,6 +92,25 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [calendarTarget, setCalendarTarget] = useState<CalendarTarget>(null);
   const [cameraVisible, setCameraVisible] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+
+  function showNotice(title: string, message: string) {
+    if (Platform.OS === 'web') {
+      setConfirmDialog({ title, message, actions: [{ text: 'OK', style: 'cancel' }] });
+      return;
+    }
+
+    Alert.alert(title, message);
+  }
+
+  function confirmAction(title: string, message: string, actions: AlertButton[]) {
+    if (Platform.OS === 'web') {
+      setConfirmDialog({ title, message, actions });
+      return;
+    }
+
+    Alert.alert(title, message, actions);
+  }
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -163,7 +189,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   async function pickImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('画像を選べません', '写真へのアクセスを許可してください。');
+      showNotice('画像を選べません', '写真へのアクセスを許可してください。');
       return;
     }
 
@@ -200,7 +226,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
 
   function confirmRemoveImage() {
     if (!currentEditImageUri) return;
-    Alert.alert('画像を外しますか？', '保存するまで変更は確定しません。', [
+    confirmAction('画像を外しますか？', '保存するまで変更は確定しません。', [
       { text: 'キャンセル', style: 'cancel' },
       {
         text: '外す',
@@ -212,7 +238,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
 
   function buildTradeInput(nextImageValue: string | null): TradeInput | null {
     if (!name.trim()) {
-      Alert.alert('入力不足', '相手のX IDまたは名前を入力してください。');
+      showNotice('入力不足', '相手のX IDまたは名前を入力してください。');
       return null;
     }
 
@@ -224,7 +250,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     const hasMoney = Boolean(nextGivePrice || nextReceivePrice);
 
     if (!hasItems && !hasMoney) {
-      Alert.alert('取引内容を入力してください', '渡すもの、受けるもの、または金額を1つ以上入力してください。');
+      showNotice('取引内容を入力してください', '渡すもの、受けるもの、または金額を1つ以上入力してください。');
       return null;
     }
 
@@ -234,7 +260,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     const nextReceived = progressManaged ? isReceived : false;
 
     if (status === '取引完了' && !(nextPacked && nextSent && nextReceived)) {
-      Alert.alert('取引完了にできません', '取引完了にするには、梱包・発送・受取をすべて済にしてください。');
+      showNotice('取引完了にできません', '取引完了にするには、梱包・発送・受取をすべて済にしてください。');
       return null;
     }
 
@@ -260,7 +286,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     const input = buildTradeInput(storedImageValue);
     if (!input) return;
 
-    Alert.alert('保存前に確認してください', buildTradeSummaryMessage(input, goods, Boolean(imageUri)), [
+    confirmAction('保存前に確認してください', buildTradeSummaryMessage(input, goods, Boolean(imageUri)), [
       { text: '戻る', style: 'cancel' },
       {
         text: '保存する',
@@ -310,7 +336,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   async function updateStatus(trade: Trade, nextStatus: TradeStatus) {
     if (trade.status === nextStatus) return;
 
-    Alert.alert(
+    confirmAction(
       'ステータスを変更しますか？',
       `${trade.name} のステータスを「${trade.status}」から「${nextStatus}」へ変更します。`,
       [
@@ -349,7 +375,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
 
   function updateTradeFlag(trade: Trade, field: 'is_packed' | 'is_sent' | 'is_received', value: boolean) {
     if (!canManageProgress(trade.status)) {
-      Alert.alert('進行管理できません', '梱包・発送・受取の管理はステータスが成約または取引完了の取引で使えます。');
+      showNotice('進行管理できません', '梱包・発送・受取の管理はステータスが成約または取引完了の取引で使えます。');
       return;
     }
 
@@ -357,7 +383,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     const nextFlags = getNextTradeFlags(trade, field, value);
 
     if (value && trade.status === '成約' && isTradeProgressComplete(nextFlags)) {
-      Alert.alert(
+      confirmAction(
         '取引完了にしますか？',
         `${trade.name} の梱包・発送・受取がすべて済になります。ステータスも「取引完了」に変更しますか？`,
         [
@@ -376,7 +402,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     }
 
     if (!value && trade.status === '取引完了') {
-      Alert.alert(
+      confirmAction(
         '取引完了を戻しますか？',
         `${trade.name} の「${flagLabels[field]}」を未完了に戻し、ステータスも「成約」に戻します。`,
         [
@@ -390,7 +416,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
       return;
     }
 
-    Alert.alert(
+    confirmAction(
       `${flagLabels[field]}を変更しますか？`,
       `${trade.name} の「${flagLabels[field]}」を${action}操作です。発送・受取は在庫数にも反映されます。`,
       [
@@ -434,7 +460,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   function confirmModalStatusChange(nextStatus: TradeStatus) {
     if (status === nextStatus) return;
 
-    Alert.alert('ステータスを変更しますか？', `編集中の取引を「${status}」から「${nextStatus}」へ変更します。`, [
+    confirmAction('ステータスを変更しますか？', `編集中の取引を「${status}」から「${nextStatus}」へ変更します。`, [
       { text: 'キャンセル', style: 'cancel' },
       {
         text: '変更する',
@@ -470,7 +496,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     });
 
     if (nextValue && status === '成約' && isTradeProgressComplete(nextFlags)) {
-      Alert.alert(
+      confirmAction(
         '取引完了にしますか？',
         '梱包・発送・受取がすべて済になります。ステータスも「取引完了」に変更しますか？',
         [
@@ -492,7 +518,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     }
 
     if (!nextValue && status === '取引完了') {
-      Alert.alert(
+      confirmAction(
         '取引完了を戻しますか？',
         `「${flagLabels[field]}」を未完了に戻し、ステータスも「成約」に戻します。`,
         [
@@ -509,7 +535,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
       return;
     }
 
-    Alert.alert(
+    confirmAction(
       `${flagLabels[field]}を変更しますか？`,
       `編集中の取引の「${flagLabels[field]}」を${action}操作です。保存すると在庫計算に反映されます。`,
       [
@@ -523,7 +549,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   }
 
   async function confirmDelete(trade: Trade) {
-    Alert.alert('削除しますか？', `${trade.name} の取引を削除します。`, [
+    confirmAction('削除しますか？', `${trade.name} の取引を削除します。`, [
       { text: 'キャンセル', style: 'cancel' },
       {
         text: '削除する',
@@ -886,6 +912,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
         title={previewImage?.title}
         onClose={() => setPreviewImage(null)}
       />
+      <ConfirmDialog dialog={confirmDialog} onClose={() => setConfirmDialog(null)} />
     </View>
   );
 }
@@ -1022,6 +1049,52 @@ function CalendarPickerModal({
         </View>
       </View>
     </View>
+  );
+}
+
+function ConfirmDialog({
+  dialog,
+  onClose,
+}: {
+  dialog: ConfirmDialogState;
+  onClose: () => void;
+}) {
+  if (!dialog) return null;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.confirmOverlay}>
+        <View style={styles.confirmPanel}>
+          <Text style={styles.confirmTitle}>{dialog.title}</Text>
+          <ScrollView style={styles.confirmMessageScroll} contentContainerStyle={styles.confirmMessageContent}>
+            <Text style={styles.confirmMessage}>{dialog.message}</Text>
+          </ScrollView>
+          <View style={styles.confirmActions}>
+            {dialog.actions.map((action, index) => {
+              const label = action.text ?? 'OK';
+              const variant =
+                action.style === 'destructive'
+                  ? 'danger'
+                  : action.style === 'cancel'
+                    ? 'cancel'
+                    : 'primary';
+
+              return (
+                <AppButton
+                  key={`${label}-${index}`}
+                  label={label}
+                  variant={variant}
+                  onPress={() => {
+                    onClose();
+                    action.onPress?.();
+                  }}
+                />
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -1721,6 +1794,7 @@ const styles = StyleSheet.create({
   },
   calendarOverlay: {
     ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
     backgroundColor: 'rgba(15, 23, 42, 0.42)',
     justifyContent: 'center',
     padding: 18,
@@ -1731,7 +1805,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     gap: 14,
+    maxWidth: 420,
     padding: 16,
+    width: '100%',
   },
   calendarTitle: {
     color: colors.text,
@@ -1788,6 +1864,46 @@ const styles = StyleSheet.create({
     color: colors.primaryText,
   },
   calendarActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
+  confirmOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 18,
+  },
+  confirmPanel: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 14,
+    maxHeight: '86%',
+    maxWidth: 480,
+    padding: 16,
+    width: '100%',
+  },
+  confirmTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  confirmMessageScroll: {
+    maxHeight: 360,
+  },
+  confirmMessageContent: {
+    paddingBottom: 4,
+  },
+  confirmMessage: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  confirmActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
