@@ -1,6 +1,6 @@
 # グッとれ Mobile
 
-グッズ交換在庫管理アプリ「グッとれ」のReact Native / Expo版です。
+グッズ交換管理アプリ「グッとれ」のReact Native / Expo版です。
 
 既存のWeb版は残し、この `mobile` フォルダを別プロジェクトとして育てます。
 

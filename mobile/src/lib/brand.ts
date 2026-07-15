@@ -1,5 +1,5 @@
 export const appBrand = {
   name: 'グッとれ',
-  subtitle: 'グッズ交換在庫管理アプリ',
+  subtitle: 'グッズ交換管理アプリ',
   authCallbackUrl: 'guttore://auth/callback',
 };

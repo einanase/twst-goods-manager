@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="520" viewBox="0 0 1600 520" role="img" aria-labelledby="title desc">
   <title id="title">グッとれ ロゴ</title>
-  <desc id="desc">グッズ交換在庫管理アプリ「グッとれ」の横長ロゴ。</desc>
+  <desc id="desc">グッズ交換管理アプリ「グッとれ」の横長ロゴ。</desc>
   <defs>
     <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#12312D" flood-opacity="0.14"/>
@@ -33,7 +33,7 @@
       <tspan fill="#22A891">グッ</tspan><tspan>と</tspan><tspan fill="#F26445">れ</tspan>
     </text>
     <text x="9" y="205" font-family="Noto Sans JP, Yu Gothic, sans-serif" font-size="36" font-weight="700" letter-spacing="0" fill="#41515C">
-      グッズ交換在庫管理アプリ
+      グッズ交換管理アプリ
     </text>
 
     <g transform="translate(12 246)">
