@@ -40,6 +40,14 @@
           "photosPermission": "在庫画像や取引画像を追加するために写真へのアクセスを使用します。",
           "cameraPermission": "在庫画像や取引画像を撮影するためにカメラを使用します。"
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "在庫画像や取引画像を撮影するためにカメラを使用します。",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
       ]
     ]
   }

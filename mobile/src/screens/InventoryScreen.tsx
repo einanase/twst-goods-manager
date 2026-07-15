@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { AppButton } from '../components/AppButton';
+import { CameraCaptureModal, type CapturedImageAsset } from '../components/CameraCaptureModal';
 import { EmptyState } from '../components/EmptyState';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { QuantityStepper } from '../components/QuantityStepper';
@@ -46,6 +47,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   const [storedImageValue, setStoredImageValue] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<ImagePreview>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [cameraVisible, setCameraVisible] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -71,6 +73,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   }, [items, search]);
 
   function openCreate() {
+    setCameraVisible(false);
     setEditingItem(null);
     setType('');
     setName('');
@@ -82,6 +85,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   }
 
   function openEdit(item: GoodsItem) {
+    setCameraVisible(false);
     setEditingItem(item);
     setType(item.type ?? '');
     setName(item.char ?? '');
@@ -109,24 +113,16 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
     }
   }
 
-  async function takePhoto() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('撮影できません', 'カメラへのアクセスを許可してください。');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: false,
-      quality: 0.82,
-    });
-
-    if (!result.canceled) {
-      applyPickedImage(result.assets[0]);
-    }
+  function takePhoto() {
+    setCameraVisible(true);
   }
 
-  function applyPickedImage(asset: ImagePicker.ImagePickerAsset | undefined) {
+  function applyCapturedPhoto(asset: CapturedImageAsset) {
+    applyPickedImage(asset);
+    setCameraVisible(false);
+  }
+
+  function applyPickedImage(asset: Pick<ImagePicker.ImagePickerAsset, 'uri' | 'fileName'> | undefined) {
     if (!asset?.uri) return;
     setImageUri(asset.uri);
     setImageName(asset.fileName ?? null);
@@ -190,6 +186,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         if (!editingItem) return [saved, ...current];
         return current.map((item) => (String(item.id) === String(saved.id) ? saved : item));
       });
+      setCameraVisible(false);
       setModalVisible(false);
     } catch (error) {
       showError('在庫の保存に失敗しました', error);
@@ -311,7 +308,14 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         />
       )}
 
-      <Modal animationType="slide" visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
+      <Modal
+        animationType="slide"
+        visible={modalVisible}
+        onRequestClose={() => {
+          setCameraVisible(false);
+          setModalVisible(false);
+        }}
+      >
         <ScrollView contentContainerStyle={styles.modalContent}>
           <Text style={styles.modalTitle}>{editingItem ? '在庫を編集' : '在庫を追加'}</Text>
           <TextField label="グッズ種類" value={type} onChangeText={setType} placeholder="例：缶バッジ" />
@@ -359,7 +363,15 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
           </View>
 
           <View style={styles.modalActions}>
-            <AppButton label="キャンセル" variant="ghost" disabled={saving} onPress={() => setModalVisible(false)} />
+            <AppButton
+              label="キャンセル"
+              variant="ghost"
+              disabled={saving}
+              onPress={() => {
+                setCameraVisible(false);
+                setModalVisible(false);
+              }}
+            />
             <AppButton
               label={uploadingImage ? '画像アップロード中...' : saving ? '保存中...' : '保存する'}
               disabled={saving}
@@ -372,6 +384,12 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         uri={previewImage?.uri ?? null}
         title={previewImage?.title}
         onClose={() => setPreviewImage(null)}
+      />
+      <CameraCaptureModal
+        visible={cameraVisible}
+        title="グッズ画像を撮影"
+        onCancel={() => setCameraVisible(false)}
+        onUsePhoto={applyCapturedPhoto}
       />
     </View>
   );

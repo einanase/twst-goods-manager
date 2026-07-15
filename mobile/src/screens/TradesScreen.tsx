@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { AppButton } from '../components/AppButton';
+import { CameraCaptureModal, type CapturedImageAsset } from '../components/CameraCaptureModal';
 import { EmptyState } from '../components/EmptyState';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { QuantityStepper } from '../components/QuantityStepper';
@@ -83,6 +84,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   const [previewImage, setPreviewImage] = useState<ImagePreview>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [calendarTarget, setCalendarTarget] = useState<CalendarTarget>(null);
+  const [cameraVisible, setCameraVisible] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -113,6 +115,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   }, [memoSearch, search, statusFilter, trades]);
 
   function openCreate() {
+    setCameraVisible(false);
     setEditingTrade(null);
     setName('');
     setType('交換');
@@ -135,6 +138,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
   }
 
   function openEdit(trade: Trade) {
+    setCameraVisible(false);
     setEditingTrade(trade);
     setName(trade.name ?? '');
     setType(trade.type ?? '交換');
@@ -173,24 +177,16 @@ export function TradesScreen({ userId }: TradesScreenProps) {
     }
   }
 
-  async function takePhoto() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('撮影できません', 'カメラへのアクセスを許可してください。');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: false,
-      quality: 0.82,
-    });
-
-    if (!result.canceled) {
-      applyPickedImage(result.assets[0]);
-    }
+  function takePhoto() {
+    setCameraVisible(true);
   }
 
-  function applyPickedImage(asset: ImagePicker.ImagePickerAsset | undefined) {
+  function applyCapturedPhoto(asset: CapturedImageAsset) {
+    applyPickedImage(asset);
+    setCameraVisible(false);
+  }
+
+  function applyPickedImage(asset: Pick<ImagePicker.ImagePickerAsset, 'uri' | 'fileName'> | undefined) {
     if (!asset?.uri) return;
     setImageUri(asset.uri);
     setImageName(asset.fileName ?? null);
@@ -301,6 +297,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
       const nextGoods = await syncStockAfterTradeChange(oldTrade, saved, goods, nextTrades, userId);
       setTrades(nextTrades);
       setGoods(nextGoods);
+      setCameraVisible(false);
       setModalVisible(false);
     } catch (error) {
       showError('取引の保存に失敗しました', error);
@@ -673,7 +670,14 @@ export function TradesScreen({ userId }: TradesScreenProps) {
         />
       )}
 
-      <Modal animationType="slide" visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
+      <Modal
+        animationType="slide"
+        visible={modalVisible}
+        onRequestClose={() => {
+          setCameraVisible(false);
+          setModalVisible(false);
+        }}
+      >
         <View style={styles.modalRoot}>
           <ScrollView contentContainerStyle={styles.modalContent}>
             <Text style={styles.modalTitle}>{editingTrade ? '取引を編集' : '取引を追加'}</Text>
@@ -823,7 +827,15 @@ export function TradesScreen({ userId }: TradesScreenProps) {
 
           <View style={styles.modalActions}>
             <View style={styles.modalNavActions}>
-              <AppButton label="キャンセル" variant="cancel" disabled={saving} onPress={() => setModalVisible(false)} />
+              <AppButton
+                label="キャンセル"
+                variant="cancel"
+                disabled={saving}
+                onPress={() => {
+                  setCameraVisible(false);
+                  setModalVisible(false);
+                }}
+              />
               <View style={styles.modalStepActions}>
                 {!isFirstTradeFormStep ? (
                   <AppButton label="前へ" variant="ghost" disabled={saving} onPress={() => moveTradeFormStep(-1)} />
@@ -862,6 +874,12 @@ export function TradesScreen({ userId }: TradesScreenProps) {
         uri={previewImage?.uri ?? null}
         title={previewImage?.title}
         onClose={() => setPreviewImage(null)}
+      />
+      <CameraCaptureModal
+        visible={cameraVisible}
+        title="取引画像を撮影"
+        onCancel={() => setCameraVisible(false)}
+        onUsePhoto={applyCapturedPhoto}
       />
     </View>
   );
