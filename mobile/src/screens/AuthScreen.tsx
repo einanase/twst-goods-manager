@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { AppButton } from '../components/AppButton';
@@ -9,6 +9,7 @@ import { colors } from '../lib/theme';
 import { appBrand } from '../lib/brand';
 
 type AuthMode = 'login' | 'signup';
+const brandIcon = require('../../assets/app/icon.png');
 
 export function AuthScreen() {
   const [mode, setMode] = useState<AuthMode>('login');
@@ -73,6 +74,7 @@ export function AuthScreen() {
       >
         <View style={styles.panel}>
           <View style={styles.brandBlock}>
+            <Image source={brandIcon} resizeMode="contain" style={styles.brandIcon} />
             <Text style={styles.brandName}>{appBrand.name}</Text>
             <Text style={styles.brandSubtitle}>{appBrand.subtitle}</Text>
           </View>
@@ -151,7 +153,11 @@ const styles = StyleSheet.create({
   },
   brandBlock: {
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+  },
+  brandIcon: {
+    height: 84,
+    width: 84,
   },
   brandName: {
     color: colors.text,

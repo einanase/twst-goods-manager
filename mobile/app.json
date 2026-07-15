@@ -5,9 +5,16 @@
     "scheme": "guttore",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/app/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/app/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F8FFFD"
+    },
     "ios": {
       "supportsTablet": true,
+      "icon": "./assets/app/icon.png",
       "bundleIdentifier": "jp.guttore.app",
       "infoPlist": {
         "CFBundleDevelopmentRegion": "ja",
@@ -17,7 +24,14 @@
       }
     },
     "android": {
-      "package": "jp.guttore.app"
+      "package": "jp.guttore.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/app/adaptive-icon.png",
+        "backgroundColor": "#F8FFFD"
+      }
+    },
+    "web": {
+      "favicon": "./assets/app/icon.png"
     },
     "plugins": [
       [

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Image, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
 import { AppButton } from './src/components/AppButton';
@@ -13,6 +13,7 @@ import { colors } from './src/lib/theme';
 import { appBrand } from './src/lib/brand';
 
 type MainTab = 'inventory' | 'trades';
+const brandIcon = require('./assets/app/icon.png');
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -75,12 +76,15 @@ export default function App() {
     <SafeAreaView style={styles.screen}>
       <StatusBar style="dark" />
       <View style={styles.header}>
-        <View style={styles.headerTextBlock}>
-          <Text style={styles.appName}>{appBrand.name}</Text>
-          <Text style={styles.subtitleText}>{appBrand.subtitle}</Text>
-          <Text style={styles.userText} numberOfLines={1}>
-            {email}
-          </Text>
+        <View style={styles.headerIdentity}>
+          <Image source={brandIcon} resizeMode="contain" style={styles.headerIcon} />
+          <View style={styles.headerTextBlock}>
+            <Text style={styles.appName}>{appBrand.name}</Text>
+            <Text style={styles.subtitleText}>{appBrand.subtitle}</Text>
+            <Text style={styles.userText} numberOfLines={1}>
+              {email}
+            </Text>
+          </View>
         </View>
         <AppButton label="ログアウト" variant="ghost" onPress={signOut} />
       </View>
@@ -128,9 +132,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  headerIdentity: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+    paddingRight: 12,
+  },
+  headerIcon: {
+    height: 44,
+    width: 44,
+  },
   headerTextBlock: {
     flex: 1,
-    paddingRight: 12,
   },
   appName: {
     color: colors.text,

@@ -9,6 +9,15 @@
 
 - `guttore-logo.svg`: 横長ロゴ。アプリ内ヘッダー、Webサイト、ストア説明画像向け。
 - `guttore-icon.svg`: アプリアイコン原本。App Store / Google Play 用にはPNGへ書き出して使います。
+- `../app/icon.png`: Expoのアプリアイコン。
+- `../app/adaptive-icon.png`: Android adaptive icon用の前景画像。
+- `../app/splash.png`: 起動画面用ロゴ画像。
+
+PNGは次のコマンドで再生成できます。
+
+```powershell
+npm run generate-brand-assets
+```
 
 ## カラー
 
@@ -20,6 +29,4 @@
 
 ## 次に作るもの
 
-- App Store / Google Play 用アイコンPNG
-- スプラッシュ画面用ロゴPNG
 - ストア掲載用スクリーンショットのテンプレート
