@@ -30,6 +30,7 @@ import type { GoodsItem, RowId, Trade, TradeInput, TradeItem, TradeStatus, Trade
 
 type TradesScreenProps = {
   userId: string;
+  onTradesChanged?: () => void;
 };
 
 type ImagePreview = {
@@ -62,7 +63,7 @@ const tradeFormSteps: Array<{ key: TradeFormStep; label: string }> = [
   { key: 'notes', label: 'メモ' },
 ];
 
-export function TradesScreen({ userId }: TradesScreenProps) {
+export function TradesScreen({ userId, onTradesChanged }: TradesScreenProps) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [goods, setGoods] = useState<GoodsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -349,6 +350,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
       setGoods(nextGoods);
       setCameraVisible(false);
       setModalVisible(false);
+      onTradesChanged?.();
     } catch (error) {
       showError('取引の保存に失敗しました', error);
     } finally {
@@ -390,6 +392,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
       const nextGoods = await syncStockAfterTradeChange(trade, saved, previousGoods, nextTrades, userId);
       setTrades(nextTrades);
       setGoods(nextGoods);
+      onTradesChanged?.();
     } catch (error) {
       setTrades(previous);
       setGoods(previousGoods);
@@ -474,6 +477,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
       const nextGoods = await syncStockAfterTradeChange(trade, saved, previousGoods, nextTrades, userId);
       setTrades(nextTrades);
       setGoods(nextGoods);
+      onTradesChanged?.();
     } catch (error) {
       setTrades(previous);
       setGoods(previousGoods);
@@ -586,6 +590,7 @@ export function TradesScreen({ userId }: TradesScreenProps) {
             const nextGoods = await syncStockAfterTradeChange(trade, null, goods, nextTrades, userId);
             setTrades(nextTrades);
             setGoods(nextGoods);
+            onTradesChanged?.();
           } catch (error) {
             showError('削除に失敗しました', error);
           }
