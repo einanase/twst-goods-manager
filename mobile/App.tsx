@@ -151,21 +151,11 @@ export default function App() {
           </View>
         </View>
         <View style={styles.headerActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="通知"
-            onPress={openNotifications}
-            style={({ pressed }) => [styles.notificationButton, pressed ? styles.pressed : null]}
-          >
-            <BellIcon />
-            {notifications.length ? (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>
-                  {notifications.length > 9 ? '9+' : notifications.length}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
+          <AppButton
+            label="設定"
+            variant={tab === 'settings' ? 'secondary' : 'ghost'}
+            onPress={() => setTab('settings')}
+          />
           <AppButton label="ログアウト" variant="ghost" onPress={signOut} />
         </View>
       </View>
@@ -181,11 +171,22 @@ export default function App() {
           variant={tab === 'trades' ? 'primary' : 'secondary'}
           onPress={() => setTab('trades')}
         />
-        <AppButton
-          label="設定"
-          variant={tab === 'settings' ? 'primary' : 'secondary'}
-          onPress={() => setTab('settings')}
-        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="通知"
+          onPress={openNotifications}
+          style={({ pressed }) => [styles.notificationTabButton, pressed ? styles.pressed : null]}
+        >
+          <BellIcon />
+          <Text style={styles.notificationTabText}>通知</Text>
+          {notifications.length ? (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {notifications.length > 9 ? '9+' : notifications.length}
+              </Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
 
       {activeScreen}
@@ -458,16 +459,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
   },
-  notificationButton: {
+  notificationTabButton: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
     borderRadius: 8,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
     height: 42,
     justifyContent: 'center',
+    paddingHorizontal: 14,
     position: 'relative',
-    width: 42,
+  },
+  notificationTabText: {
+    color: colors.secondaryText,
+    fontSize: 14,
+    fontWeight: '800',
   },
   bellIcon: {
     alignItems: 'center',
