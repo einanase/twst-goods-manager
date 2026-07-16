@@ -16,6 +16,7 @@ import { AppButton } from './src/components/AppButton';
 import { SetupScreen } from './src/screens/SetupScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { InventoryScreen } from './src/screens/InventoryScreen';
+import { LegalScreen } from './src/screens/LegalScreen';
 import { TradesScreen } from './src/screens/TradesScreen';
 import { getSupabase } from './src/lib/supabase';
 import { hasSupabaseConfig } from './src/lib/env';
@@ -24,7 +25,7 @@ import { appBrand } from './src/lib/brand';
 import { loadTrades } from './src/services/tradeService';
 import type { Trade } from './src/types/domain';
 
-type MainTab = 'inventory' | 'trades';
+type MainTab = 'inventory' | 'trades' | 'settings';
 type DueNotificationKind = 'ship' | 'receive';
 type DueNotification = {
   key: string;
@@ -99,6 +100,7 @@ export default function App() {
   const activeScreen = useMemo(() => {
     if (!userId) return null;
     if (tab === 'inventory') return <InventoryScreen userId={userId} />;
+    if (tab === 'settings') return <LegalScreen />;
     return <TradesScreen userId={userId} onTradesChanged={refreshNotifications} />;
   }, [refreshNotifications, tab, userId]);
 
@@ -178,6 +180,11 @@ export default function App() {
           label="取引"
           variant={tab === 'trades' ? 'primary' : 'secondary'}
           onPress={() => setTab('trades')}
+        />
+        <AppButton
+          label="設定"
+          variant={tab === 'settings' ? 'primary' : 'secondary'}
+          onPress={() => setTab('settings')}
         />
       </View>
 
