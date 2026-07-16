@@ -1,7 +1,17 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { AppButton } from '../components/AppButton';
 import { colors } from '../lib/theme';
+import { deleteAccountDataWithPassword, submitSupportRequest } from '../services/supportService';
 
 type LegalDocKey = 'terms' | 'privacy' | 'contact' | 'deleteAccount';
 type LegalDoc = {
@@ -108,7 +118,7 @@ const legalDocs: LegalDoc[] = [
       {
         heading: 'お問い合わせ方法',
         body: [
-          '正式公開前のため、問い合わせ先は準備中です。公開前にサポート用メールアドレスまたは問い合わせフォームを設定します。',
+          'アプリ内の問い合わせフォームから、件名と本文を入力して送信できます。',
           '問い合わせ時には、登録メールアドレス、発生した画面、操作内容、エラーメッセージ、端末種別を添えてください。パスワードは送信しないでください。',
         ],
       },
@@ -136,23 +146,105 @@ const legalDocs: LegalDoc[] = [
       {
         heading: '削除依頼の手順',
         body: [
-          '正式公開前のため、削除依頼の受付窓口は準備中です。公開前に、アプリ内またはWebページからアカウント削除を依頼できる導線を設置します。',
-          '削除依頼時には、登録メールアドレスで本人確認を行います。確認が完了した後、対象データの削除処理を行います。',
+          'アプリ内のアカウント削除画面で、ログインパスワードを入力し、削除内容への了承チェックを行ったうえで削除を実行します。',
+          '削除を実行すると、在庫、取引、保存画像が削除され、ログアウトします。ログインアカウント本体の削除完了処理は運営側で行います。',
         ],
       },
       {
         heading: '今後の実装予定',
         body: [
-          '販売版では、利用者がアプリ内からアカウント削除を依頼または実行できる機能を提供する予定です。',
-          'App StoreやGoogle Playで公開する場合、各ストアの要件に合わせて、アカウント削除の説明ページや削除導線を整備します。',
+          '販売版では、アプリ内からログインアカウント本体まで自動削除できるサーバー処理を追加する予定です。',
+          'App StoreやGoogle Playで公開する場合、各ストアの要件に合わせて、Web上のアカウント削除説明ページも整備します。',
         ],
       },
     ],
   },
 ];
 
-export function LegalScreen() {
+type LegalScreenProps = {
+  userId: string;
+  email: string;
+};
+
+export function LegalScreen({ userId, email }: LegalScreenProps) {
   const [selectedDoc, setSelectedDoc] = useState<LegalDoc | null>(null);
+  const [contactVisible, setContactVisible] = useState(false);
+  const [contactSubject, setContactSubject] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactSending, setContactSending] = useState(false);
+  const [contactNotice, setContactNotice] = useState('');
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteAccepted, setDeleteAccepted] = useState(false);
+  const [deleteSending, setDeleteSending] = useState(false);
+  const [deleteNotice, setDeleteNotice] = useState('');
+
+  function openDoc(doc: LegalDoc) {
+    if (doc.key === 'contact') {
+      setContactVisible(true);
+      setContactNotice('');
+      return;
+    }
+
+    if (doc.key === 'deleteAccount') {
+      setDeleteVisible(true);
+      setDeleteNotice('');
+      return;
+    }
+
+    setSelectedDoc(doc);
+  }
+
+  async function sendContact() {
+    setContactNotice('');
+    if (!contactSubject.trim() || !contactMessage.trim()) {
+      setContactNotice('件名と本文を入力してください。');
+      return;
+    }
+
+    setContactSending(true);
+    try {
+      await submitSupportRequest({
+        userId,
+        email,
+        requestType: 'contact',
+        subject: contactSubject.trim(),
+        message: contactMessage.trim(),
+      });
+      setContactSubject('');
+      setContactMessage('');
+      setContactNotice('お問い合わせを送信しました。');
+    } catch (error) {
+      setContactNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setContactSending(false);
+    }
+  }
+
+  async function deleteAccountData() {
+    setDeleteNotice('');
+    if (!deletePassword) {
+      setDeleteNotice('ログインパスワードを入力してください。');
+      return;
+    }
+
+    if (!deleteAccepted) {
+      setDeleteNotice('削除内容への了承チェックが必要です。');
+      return;
+    }
+
+    setDeleteSending(true);
+    try {
+      await deleteAccountDataWithPassword({
+        userId,
+        email,
+        password: deletePassword,
+      });
+    } catch (error) {
+      setDeleteNotice(error instanceof Error ? error.message : String(error));
+      setDeleteSending(false);
+    }
+  }
 
   return (
     <View style={styles.screen}>
@@ -169,7 +261,7 @@ export function LegalScreen() {
           <Pressable
             key={doc.key}
             accessibilityRole="button"
-            onPress={() => setSelectedDoc(doc)}
+            onPress={() => openDoc(doc)}
             style={({ pressed }) => [styles.card, pressed ? styles.cardPressed : null]}
           >
             <Text style={styles.cardTitle}>{doc.title}</Text>
@@ -186,6 +278,28 @@ export function LegalScreen() {
       </ScrollView>
 
       <LegalDocModal doc={selectedDoc} onClose={() => setSelectedDoc(null)} />
+      <ContactModal
+        body={contactMessage}
+        notice={contactNotice}
+        sending={contactSending}
+        subject={contactSubject}
+        visible={contactVisible}
+        onBodyChange={setContactMessage}
+        onClose={() => setContactVisible(false)}
+        onSend={sendContact}
+        onSubjectChange={setContactSubject}
+      />
+      <DeleteAccountModal
+        accepted={deleteAccepted}
+        notice={deleteNotice}
+        password={deletePassword}
+        sending={deleteSending}
+        visible={deleteVisible}
+        onAcceptedChange={setDeleteAccepted}
+        onClose={() => setDeleteVisible(false)}
+        onDelete={deleteAccountData}
+        onPasswordChange={setDeletePassword}
+      />
     </View>
   );
 }
@@ -215,6 +329,158 @@ function LegalDocModal({ doc, onClose }: { doc: LegalDoc | null; onClose: () => 
               ))}
             </View>
           ))}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+function ContactModal({
+  body,
+  notice,
+  sending,
+  subject,
+  visible,
+  onBodyChange,
+  onClose,
+  onSend,
+  onSubjectChange,
+}: {
+  body: string;
+  notice: string;
+  sending: boolean;
+  subject: string;
+  visible: boolean;
+  onBodyChange: (value: string) => void;
+  onClose: () => void;
+  onSend: () => void;
+  onSubjectChange: (value: string) => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalRoot}>
+        <View style={styles.modalHeader}>
+          <View style={styles.modalTitleBlock}>
+            <Text style={styles.modalTitle}>お問い合わせ</Text>
+            <Text style={styles.updated}>件名と本文を入力して送信します。</Text>
+          </View>
+          <AppButton label="閉じる" variant="ghost" disabled={sending} onPress={onClose} />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.modalContent}>
+          <View style={styles.formBox}>
+            <Text style={styles.inputLabel}>件名</Text>
+            <TextInput
+              placeholder="例: 画像が表示されない"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+              value={subject}
+              onChangeText={onSubjectChange}
+            />
+            <Text style={styles.inputLabel}>本文</Text>
+            <TextInput
+              multiline
+              placeholder="発生した画面、操作内容、エラーメッセージなど"
+              placeholderTextColor={colors.muted}
+              style={[styles.input, styles.textArea]}
+              textAlignVertical="top"
+              value={body}
+              onChangeText={onBodyChange}
+            />
+            {notice ? <Text style={styles.noticeTextStrong}>{notice}</Text> : null}
+            <AppButton
+              label={sending ? '送信中...' : '送信する'}
+              disabled={sending}
+              onPress={onSend}
+            />
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+function DeleteAccountModal({
+  accepted,
+  notice,
+  password,
+  sending,
+  visible,
+  onAcceptedChange,
+  onClose,
+  onDelete,
+  onPasswordChange,
+}: {
+  accepted: boolean;
+  notice: string;
+  password: string;
+  sending: boolean;
+  visible: boolean;
+  onAcceptedChange: (value: boolean) => void;
+  onClose: () => void;
+  onDelete: () => void;
+  onPasswordChange: (value: string) => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalRoot}>
+        <View style={styles.modalHeader}>
+          <View style={styles.modalTitleBlock}>
+            <Text style={styles.modalTitle}>アカウント削除</Text>
+            <Text style={styles.updated}>本人確認後、保存データを削除します。</Text>
+          </View>
+          <AppButton label="閉じる" variant="ghost" disabled={sending} onPress={onClose} />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.modalContent}>
+          <View style={styles.dangerBox}>
+            <Text style={styles.dangerTitle}>削除されるデータ</Text>
+            <Text style={styles.dangerText}>
+              在庫、取引、取引画像、在庫画像、メモ、予定日、進行状況が削除されます。削除後は元に戻せません。
+            </Text>
+          </View>
+
+          <View style={styles.formBox}>
+            <Text style={styles.inputLabel}>ログインパスワード</Text>
+            <TextInput
+              placeholder="パスワード"
+              placeholderTextColor={colors.muted}
+              secureTextEntry
+              style={styles.input}
+              value={password}
+              onChangeText={onPasswordChange}
+            />
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: accepted }}
+              onPress={() => onAcceptedChange(!accepted)}
+              style={styles.checkboxRow}
+            >
+              <View style={[styles.checkbox, accepted ? styles.checkboxChecked : null]}>
+                {accepted ? <Text style={styles.checkboxMark}>✓</Text> : null}
+              </View>
+              <Text style={styles.checkboxText}>
+                取引・在庫・画像がすべて削除され、復元できないことを了承しました。
+              </Text>
+            </Pressable>
+            {notice ? <Text style={styles.noticeTextStrong}>{notice}</Text> : null}
+            <Pressable
+              accessibilityRole="button"
+              disabled={sending}
+              onPress={onDelete}
+              style={({ pressed }) => [
+                styles.deleteButton,
+                pressed && !sending ? styles.cardPressed : null,
+                sending ? styles.disabledButton : null,
+              ]}
+            >
+              {sending ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.deleteButtonText}>削除する</Text>
+              )}
+            </Pressable>
+          </View>
         </ScrollView>
       </View>
     </Modal>
@@ -331,5 +597,104 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     lineHeight: 22,
+  },
+  formBox: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+  },
+  inputLabel: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  input: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    color: colors.text,
+    fontSize: 16,
+    minHeight: 46,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  textArea: {
+    minHeight: 180,
+  },
+  noticeTextStrong: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 20,
+  },
+  dangerBox: {
+    backgroundColor: '#fff1f1',
+    borderColor: '#efc7c7',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 14,
+  },
+  dangerTitle: {
+    color: colors.danger,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  dangerText: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  checkboxRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  checkbox: {
+    alignItems: 'center',
+    borderColor: colors.border,
+    borderRadius: 6,
+    borderWidth: 1,
+    height: 24,
+    justifyContent: 'center',
+    marginTop: 1,
+    width: 24,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkboxMark: {
+    color: colors.primaryText,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  checkboxText: {
+    color: colors.text,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 21,
+  },
+  deleteButton: {
+    alignItems: 'center',
+    backgroundColor: colors.danger,
+    borderRadius: 8,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  deleteButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  disabledButton: {
+    opacity: 0.45,
   },
 });

@@ -114,6 +114,29 @@ export async function removeStoredImage(userId: string, imageValue: string | nul
   signedUrlCache.delete(path);
 }
 
+export async function removeUserStorageFolder(userId: string) {
+  const { data, error } = await getSupabase().storage.from(STORAGE_BUCKET).list(userId);
+  if (error) {
+    console.warn('Failed to list user storage folder:', error.message);
+    return;
+  }
+
+  const paths = (data ?? [])
+    .filter((item) => item.name)
+    .map((item) => `${userId}/${item.name}`);
+
+  if (!paths.length) return;
+
+  const { error: removeError } = await getSupabase().storage.from(STORAGE_BUCKET).remove(paths);
+  if (removeError) {
+    console.warn('Failed to remove user storage folder:', removeError.message);
+  }
+
+  for (const path of paths) {
+    signedUrlCache.delete(path);
+  }
+}
+
 function getSafeExtension(name: string) {
   const clean = name.split('?')[0]?.split('#')[0] ?? '';
   const extension = clean.split('.').pop()?.toLowerCase() ?? '';
@@ -135,4 +158,3 @@ function makeRandomId() {
   }
   return `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
-

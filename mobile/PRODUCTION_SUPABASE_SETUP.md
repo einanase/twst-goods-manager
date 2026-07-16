@@ -53,7 +53,9 @@ X ID、取引画像、メモ、発送予定などは個人情報に近い情報�
 - 奥さま用projectを開いている場合は、必ず `Cancel` してください。
 
 このSQLは、実データを作成・コピーしません。
-作るものは、`goods` / `trades` テーブル、ユーザー分離用RLS、private画像bucketだけです。
+作るものは、`goods` / `trades` / `support_requests` テーブル、ユーザー分離用RLS、private画像bucketだけです。
+
+すでに `PRODUCTION_SUPABASE_INIT.sql` を実行済みで、あとから問い合わせフォームだけ追加する場合は、代わりに [SUPPORT_REQUESTS_SETUP.sql](./SUPPORT_REQUESTS_SETUP.sql) だけを実行します。
 
 ## 4. 安全設定を確認する
 
@@ -63,6 +65,7 @@ X ID、取引画像、メモ、発送予定などは個人情報に近い情報�
 
 - `goods` と `trades` の `rls_enabled` が `true`
 - `goods` と `trades` のpolicyが `authenticated` かつ `user_id = auth.uid()` になっている
+- `support_requests` は本人の問い合わせだけ `select` / `insert` できる
 - `mailing-images` bucket の `public` が `false`
 - storage policyが `mailing-images` かつ本人のユーザーIDフォルダだけを許可している
 

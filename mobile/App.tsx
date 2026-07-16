@@ -100,7 +100,7 @@ export default function App() {
   const activeScreen = useMemo(() => {
     if (!userId) return null;
     if (tab === 'inventory') return <InventoryScreen userId={userId} />;
-    if (tab === 'settings') return <LegalScreen />;
+    if (tab === 'settings') return <LegalScreen userId={userId} email={email} />;
     return <TradesScreen userId={userId} onTradesChanged={refreshNotifications} />;
   }, [refreshNotifications, tab, userId]);
 
