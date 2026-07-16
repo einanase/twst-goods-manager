@@ -127,3 +127,4 @@ npm.cmd start -- --tunnel --clear
 - `mailing-images` bucket の Public bucket が OFF
 - 新規登録メールを見て、何のアプリの認証か分かる
 - 画像アップロード後、別ユーザーから画像URLを推測しても見えない
+- 問い合わせが `support_requests` に保存され、運用手順 [SUPPORT_OPERATIONS.md](./SUPPORT_OPERATIONS.md) に沿って確認できる
