@@ -22,18 +22,23 @@ export async function submitSupportRequest({
   message,
   metadata,
 }: SupportRequestInput) {
-  const { error } = await getSupabase().from('support_requests').insert([
-    {
-      user_id: userId,
-      email,
-      request_type: requestType,
-      subject,
-      message,
-      metadata: metadata ?? {},
-    },
-  ]);
+  const { data, error } = await getSupabase()
+    .from('support_requests')
+    .insert([
+      {
+        user_id: userId,
+        email,
+        request_type: requestType,
+        subject,
+        message,
+        metadata: metadata ?? {},
+      },
+    ])
+    .select('id')
+    .single();
 
   if (error) throw error;
+  return String(data?.id ?? '');
 }
 
 export async function deleteAccountDataWithPassword({

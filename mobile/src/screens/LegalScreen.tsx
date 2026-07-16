@@ -14,6 +14,8 @@ import { colors } from '../lib/theme';
 import { deleteAccountDataWithPassword, submitSupportRequest } from '../services/supportService';
 
 type LegalDocKey = 'terms' | 'privacy' | 'contact' | 'deleteAccount';
+type ContactCategoryKey = 'bug' | 'howto' | 'request' | 'account' | 'other';
+
 type LegalDoc = {
   key: LegalDocKey;
   title: string;
@@ -24,7 +26,51 @@ type LegalDoc = {
   }>;
 };
 
+type ContactCategory = {
+  key: ContactCategoryKey;
+  label: string;
+  description: string;
+  replyText: string;
+};
+
 const updatedAt = '2026年7月16日';
+
+const contactCategories: ContactCategory[] = [
+  {
+    key: 'bug',
+    label: '不具合',
+    description: '動かない、表示がおかしい、保存できないなど',
+    replyText: '状況を確認し、再現に必要な情報があれば登録メールアドレスへ連絡します。',
+  },
+  {
+    key: 'howto',
+    label: '使い方',
+    description: '操作方法や設定方法について',
+    replyText: '内容を確認し、使い方の案内が必要な場合は登録メールアドレスへ返信します。',
+  },
+  {
+    key: 'request',
+    label: 'リクエスト',
+    description: '追加してほしい機能、改善してほしい点など',
+    replyText: '今後の改善候補として確認します。詳しく聞きたい場合は登録メールアドレスへ連絡します。',
+  },
+  {
+    key: 'account',
+    label: 'アカウント・データ',
+    description: 'ログイン、データ、削除、課金まわりの相談',
+    replyText: '本人確認や追加確認が必要な場合は、登録メールアドレスへ連絡します。',
+  },
+  {
+    key: 'other',
+    label: 'その他',
+    description: '上のどれにも当てはまらない内容',
+    replyText: '内容を確認し、必要に応じて登録メールアドレスへ返信します。',
+  },
+];
+
+function getContactCategory(key: ContactCategoryKey) {
+  return contactCategories.find((category) => category.key === key) ?? contactCategories[0]!;
+}
 
 const legalDocs: LegalDoc[] = [
   {
@@ -169,6 +215,7 @@ type LegalScreenProps = {
 export function LegalScreen({ userId, email }: LegalScreenProps) {
   const [selectedDoc, setSelectedDoc] = useState<LegalDoc | null>(null);
   const [contactVisible, setContactVisible] = useState(false);
+  const [contactCategory, setContactCategory] = useState<ContactCategoryKey>('bug');
   const [contactSubject, setContactSubject] = useState('');
   const [contactMessage, setContactMessage] = useState('');
   const [contactSending, setContactSending] = useState(false);
@@ -204,16 +251,25 @@ export function LegalScreen({ userId, email }: LegalScreenProps) {
 
     setContactSending(true);
     try {
-      await submitSupportRequest({
+      const requestId = await submitSupportRequest({
         userId,
         email,
         requestType: 'contact',
         subject: contactSubject.trim(),
         message: contactMessage.trim(),
+        metadata: {
+          category: contactCategory,
+        },
       });
+      const shortRequestId = requestId ? requestId.slice(0, 8) : '';
+      const selectedCategory = getContactCategory(contactCategory);
       setContactSubject('');
       setContactMessage('');
-      setContactNotice('お問い合わせを送信しました。');
+      setContactNotice(
+        `お問い合わせを受け付けました${
+          shortRequestId ? `（受付番号: ${shortRequestId}）` : ''
+        }。\n${selectedCategory.replyText}`,
+      );
     } catch (error) {
       setContactNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -280,11 +336,15 @@ export function LegalScreen({ userId, email }: LegalScreenProps) {
       <LegalDocModal doc={selectedDoc} onClose={() => setSelectedDoc(null)} />
       <ContactModal
         body={contactMessage}
+        categoryKey={contactCategory}
+        categories={contactCategories}
         notice={contactNotice}
+        replyEmail={email}
         sending={contactSending}
         subject={contactSubject}
         visible={contactVisible}
         onBodyChange={setContactMessage}
+        onCategoryChange={setContactCategory}
         onClose={() => setContactVisible(false)}
         onSend={sendContact}
         onSubjectChange={setContactSubject}
@@ -337,25 +397,35 @@ function LegalDocModal({ doc, onClose }: { doc: LegalDoc | null; onClose: () => 
 
 function ContactModal({
   body,
+  categories,
+  categoryKey,
   notice,
+  replyEmail,
   sending,
   subject,
   visible,
   onBodyChange,
+  onCategoryChange,
   onClose,
   onSend,
   onSubjectChange,
 }: {
   body: string;
+  categories: ContactCategory[];
+  categoryKey: ContactCategoryKey;
   notice: string;
+  replyEmail: string;
   sending: boolean;
   subject: string;
   visible: boolean;
   onBodyChange: (value: string) => void;
+  onCategoryChange: (value: ContactCategoryKey) => void;
   onClose: () => void;
   onSend: () => void;
   onSubjectChange: (value: string) => void;
 }) {
+  const selectedCategory = getContactCategory(categoryKey);
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalRoot}>
@@ -369,6 +439,37 @@ function ContactModal({
 
         <ScrollView contentContainerStyle={styles.modalContent}>
           <View style={styles.formBox}>
+            <Text style={styles.helperText}>
+              返信が必要な場合は、登録メールアドレス（{replyEmail}）宛に連絡します。
+            </Text>
+            <Text style={styles.inputLabel}>お問い合わせの種類</Text>
+            <View style={styles.categoryGrid}>
+              {categories.map((category) => {
+                const selected = category.key === categoryKey;
+                return (
+                  <Pressable
+                    key={category.key}
+                    accessibilityRole="button"
+                    onPress={() => onCategoryChange(category.key)}
+                    style={({ pressed }) => [
+                      styles.categoryChip,
+                      selected ? styles.categoryChipSelected : null,
+                      pressed ? styles.cardPressed : null,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        selected ? styles.categoryChipTextSelected : null,
+                      ]}
+                    >
+                      {category.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.helperText}>{selectedCategory.description}</Text>
             <Text style={styles.inputLabel}>件名</Text>
             <TextInput
               placeholder="例: 画像が表示されない"
@@ -610,6 +711,40 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 13,
     fontWeight: '900',
+  },
+  helperText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryChip: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  categoryChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  categoryChipText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  categoryChipTextSelected: {
+    color: colors.primaryText,
   },
   input: {
     backgroundColor: colors.surface,
