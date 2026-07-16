@@ -117,6 +117,7 @@ Web版のSite URLは、今まで通りGitHub PagesのURLで大丈夫です。
 - 本番販売前には、奥さまの実データが入ったSupabaseとは別に、販売用Supabase projectを作ります。
 - 販売用Supabaseの作成手順は [PRODUCTION_SUPABASE_SETUP.md](./PRODUCTION_SUPABASE_SETUP.md) にまとめています。
 - 問い合わせ対応の運用手順は [SUPPORT_OPERATIONS.md](./SUPPORT_OPERATIONS.md) にまとめています。
+- 問い合わせ到着時のメール通知設定は [SUPPORT_NOTIFICATION_SETUP.md](./SUPPORT_NOTIFICATION_SETUP.md) にまとめています。
 - 現在の安全確認メモは [../SECURITY_PRIVACY_AUDIT.md](../SECURITY_PRIVACY_AUDIT.md) にまとめています。
 
 ## 販売化までの次ステップ

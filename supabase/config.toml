@@ -1,0 +1,2 @@
+[functions.notify-support-request]
+verify_jwt = false

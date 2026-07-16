@@ -58,6 +58,8 @@
 
 SQL Editor を使う場合は [SUPPORT_OPERATIONS_QUERIES.sql](./SUPPORT_OPERATIONS_QUERIES.sql) の確認SQLを使います。
 
+問い合わせ到着時のメール通知を使う場合は [SUPPORT_NOTIFICATION_SETUP.md](./SUPPORT_NOTIFICATION_SETUP.md) を設定します。
+
 ## 返信テンプレート
 
 ### 不具合
@@ -114,7 +116,7 @@ SQL Editor を使う場合は [SUPPORT_OPERATIONS_QUERIES.sql](./SUPPORT_OPERATI
 
 ## 次に自動化すること
 
-- 問い合わせ受付時の自動返信メール
+- 問い合わせ受付時のメール通知と自動返信: [SUPPORT_NOTIFICATION_SETUP.md](./SUPPORT_NOTIFICATION_SETUP.md)
 - `status` 変更時の対応メモ保存
 - アカウント本体削除を行う Supabase Edge Function
 - 管理者だけが見られるサポート管理画面

@@ -1,1 +1,3 @@
 backups/
+supabase/.temp/
+supabase/functions/.env
