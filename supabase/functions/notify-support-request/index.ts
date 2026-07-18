@@ -177,6 +177,7 @@ async function sendEmail({
     headers: {
       Authorization: `Bearer ${getRequiredEnv('RESEND_API_KEY')}`,
       'Content-Type': 'application/json',
+      'User-Agent': 'guttore-support-notifier/0.1',
     },
     body: JSON.stringify({
       from: getRequiredEnv('SUPPORT_NOTIFY_FROM'),
