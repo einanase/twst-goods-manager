@@ -56,16 +56,22 @@ Deno.serve(async (request) => {
 
   const record = payload.record;
   const category = getCategory(record);
+  let userReceiptSent = false;
 
-  await Promise.all([
-    sendOperatorNotification(record, category),
-    sendUserReceipt(record, category),
-  ]);
+  await sendOperatorNotification(record, category);
+
+  try {
+    await sendUserReceipt(record, category);
+    userReceiptSent = true;
+  } catch (error) {
+    console.error('Failed to send support request user receipt:', error);
+  }
 
   return jsonResponse({
     ok: true,
     request_no: getRequestNo(record.id),
     category,
+    user_receipt_sent: userReceiptSent,
   });
 });
 

@@ -9,6 +9,17 @@
 このFunctionは、Supabase Database Webhookから呼ばれたときだけ動きます。
 アプリ本体にはメール送信用APIキーを入れません。
 
+## 現在の設定状態
+
+2026年7月19日に、販売/審査用 project `bzppocdaaakkvmrnueyh` へ次を設定済みです。
+
+- Edge Function `notify-support-request` のデプロイ
+- `SUPPORT_WEBHOOK_SECRET` の登録
+- `support_requests` への `AFTER INSERT` トリガー `notify_support_request_webhook`
+
+そのため、同じprojectでは「5. Database Webhookを作る」を手動で繰り返す必要はありません。
+再作成したい場合だけ、下の手順またはSQLトリガーを使います。
+
 ## できること
 
 問い合わせが保存されると、次の2通を送ります。
@@ -101,6 +112,9 @@ https://bzppocdaaakkvmrnueyh.supabase.co/functions/v1/notify-support-request
 ```
 
 ## 5. Database Webhookを作る
+
+この手順は手動で作る場合の予備手順です。
+現在の販売/審査用 project では、CLIから同等のDBトリガーを作成済みです。
 
 Supabase Dashboardで行います。
 
