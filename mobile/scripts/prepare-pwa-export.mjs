@@ -231,6 +231,10 @@ export default {
     const direct = assetResponse(pathname);
     if (direct) return direct;
 
+    if (request.method === 'GET' && !pathname.split('/').pop()?.includes('.')) {
+      return assetResponse('/index.html');
+    }
+
     const acceptsHtml = request.headers.get('accept')?.includes('text/html');
     if (request.method === 'GET' && acceptsHtml) {
       return assetResponse('/index.html');
