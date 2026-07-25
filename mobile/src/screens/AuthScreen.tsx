@@ -44,7 +44,7 @@ export function AuthScreen() {
           email: email.trim(),
           password,
           options: {
-            emailRedirectTo: Linking.createURL('auth/callback'),
+            emailRedirectTo: getAuthRedirectUrl(),
           },
         });
         if (error) throw error;
@@ -131,6 +131,14 @@ export function AuthScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+function getAuthRedirectUrl() {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return `${window.location.origin}/auth/callback`;
+  }
+
+  return Linking.createURL('auth/callback');
 }
 
 const styles = StyleSheet.create({
