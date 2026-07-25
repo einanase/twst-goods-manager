@@ -23,6 +23,15 @@ import { QuantityStepper } from '../components/QuantityStepper';
 import { TextField } from '../components/TextField';
 import { calculatePlannedStockCount } from '../lib/stockProjection';
 import { colors } from '../lib/theme';
+import {
+  formatTradeItemQuantity,
+  getFixedTradeItemCount,
+  hasRangeTradeItems,
+  isRangeTradeItem,
+  normalizeTradeItems,
+  sanitizeFixedCount,
+  sanitizeRangeCount,
+} from '../lib/tradeItemQuantity';
 import { loadGoods, updateGoodsStock } from '../services/goodsService';
 import { createTrade, deleteTrade, loadTrades, patchTrade, updateTrade } from '../services/tradeService';
 import { getStoredImageValue, removeStoredImage, uploadPrivateImageFromUri } from '../services/imageStorage';
@@ -269,13 +278,21 @@ export function TradesScreen({ userId, onTradesChanged }: TradesScreenProps) {
 
     const nextGivePrice = parseMoneyInput(givePrice);
     const nextReceivePrice = parseMoneyInput(receivePrice);
-    const normalizedGiveItems = giveItems.filter((item) => item.count > 0);
-    const normalizedReceiveItems = receiveItems.filter((item) => item.count > 0);
+    const normalizedGiveItems = normalizeTradeItems(giveItems);
+    const normalizedReceiveItems = normalizeTradeItems(receiveItems);
     const hasItems = Boolean(normalizedGiveItems.length || normalizedReceiveItems.length);
     const hasMoney = Boolean(nextGivePrice || nextReceivePrice);
 
     if (!hasItems && !hasMoney) {
       showNotice('取引内容を入力してください', '渡すもの、受けるもの、または金額を1つ以上入力してください。');
+      return null;
+    }
+
+    if (requiresFixedQuantity(status) && hasRangeTradeItems([...normalizedGiveItems, ...normalizedReceiveItems])) {
+      showNotice(
+        '数量を確定してください',
+        '成約または取引完了にする場合は、渡すもの・受けるものの数量を固定数にしてください。',
+      );
       return null;
     }
 
@@ -362,6 +379,14 @@ export function TradesScreen({ userId, onTradesChanged }: TradesScreenProps) {
   async function updateStatus(trade: Trade, nextStatus: TradeStatus) {
     if (trade.status === nextStatus) return;
 
+    if (requiresFixedQuantity(nextStatus) && hasRangeTradeItems([...(trade.give_items ?? []), ...(trade.receive_items ?? [])])) {
+      showNotice(
+        '数量を確定してください',
+        '成約または取引完了にする場合は、取引を開いて範囲指定を固定数に戻してください。',
+      );
+      return;
+    }
+
     confirmAction(
       'ステータスを変更しますか？',
       `${trade.name} のステータスを「${trade.status}」から「${nextStatus}」へ変更します。`,
@@ -403,6 +428,14 @@ export function TradesScreen({ userId, onTradesChanged }: TradesScreenProps) {
   function updateTradeFlag(trade: Trade, field: 'is_packed' | 'is_sent' | 'is_received', value: boolean) {
     if (!canManageProgress(trade.status)) {
       showNotice('進行管理できません', '梱包・発送・受取の管理はステータスが成約または取引完了の取引で使えます。');
+      return;
+    }
+
+    if (requiresFixedQuantity(trade.status) && hasRangeTradeItems([...(trade.give_items ?? []), ...(trade.receive_items ?? [])])) {
+      showNotice(
+        '数量を確定してください',
+        '進行管理を使う前に、取引を開いて範囲指定を固定数に戻してください。',
+      );
       return;
     }
 
@@ -488,6 +521,15 @@ export function TradesScreen({ userId, onTradesChanged }: TradesScreenProps) {
   function confirmModalStatusChange(nextStatus: TradeStatus) {
     if (status === nextStatus) return;
 
+    if (requiresFixedQuantity(nextStatus) && hasRangeTradeItems([...giveItems, ...receiveItems])) {
+      showNotice(
+        '数量を確定してください',
+        '成約または取引完了にする場合は、品物タブで範囲指定を固定数に戻してください。',
+      );
+      setTradeFormStep('items');
+      return;
+    }
+
     confirmAction('ステータスを変更しますか？', `編集中の取引を「${status}」から「${nextStatus}」へ変更します。`, [
       { text: 'キャンセル', style: 'cancel' },
       {
@@ -515,6 +557,15 @@ export function TradesScreen({ userId, onTradesChanged }: TradesScreenProps) {
     setter: (value: boolean) => void,
   ) {
     if (currentValue === nextValue) return;
+
+    if (requiresFixedQuantity(status) && hasRangeTradeItems([...giveItems, ...receiveItems])) {
+      showNotice(
+        '数量を確定してください',
+        '進行管理を使う前に、品物タブで範囲指定を固定数に戻してください。',
+      );
+      setTradeFormStep('items');
+      return;
+    }
 
     const action = nextValue ? '済みにする' : '未完了に戻す';
     const nextFlags = getNextModalFlags(field, nextValue, {
@@ -779,8 +830,20 @@ export function TradesScreen({ userId, onTradesChanged }: TradesScreenProps) {
 
             {tradeFormStep === 'items' ? (
               <>
-                <TradeItemEditor title="渡すもの" goods={goods} items={giveItems} onChange={setGiveItems} />
-                <TradeItemEditor title="受けるもの" goods={goods} items={receiveItems} onChange={setReceiveItems} />
+                <TradeItemEditor
+                  title="渡すもの"
+                  goods={goods}
+                  items={giveItems}
+                  allowRange={!requiresFixedQuantity(status)}
+                  onChange={setGiveItems}
+                />
+                <TradeItemEditor
+                  title="受けるもの"
+                  goods={goods}
+                  items={receiveItems}
+                  allowRange={!requiresFixedQuantity(status)}
+                  onChange={setReceiveItems}
+                />
                 <View style={styles.moneyPanel}>
                   <Text style={styles.sectionLabel}>お金のやり取り</Text>
                   <View style={styles.moneyInputGrid}>
@@ -959,7 +1022,7 @@ function TradeItemsLabel({ title, items, goods }: { title: string; items: TradeI
           const good = goods.find((candidate) => String(candidate.id) === String(item.id));
           return (
             <Text key={`${title}-${item.id}`} style={styles.tradeItemsText}>
-              {good ? `${good.type} / ${good.char}` : `ID:${item.id}`} x{item.count}
+              {good ? `${good.type} / ${good.char}` : `ID:${item.id}`} {formatTradeItemQuantity(item)}
             </Text>
           );
         })
@@ -1223,36 +1286,104 @@ function TradeItemEditor({
   title,
   goods,
   items,
+  allowRange,
   onChange,
 }: {
   title: string;
   goods: GoodsItem[];
   items: TradeItem[];
+  allowRange: boolean;
   onChange: (items: TradeItem[]) => void;
 }) {
-  function quantityFor(id: RowId) {
-    return items.find((item) => String(item.id) === String(id))?.count ?? 0;
+  function itemFor(id: RowId) {
+    return items.find((item) => String(item.id) === String(id));
   }
 
-  function setQuantity(id: RowId, count: number) {
+  function setFixedQuantity(id: RowId, count: number) {
     const next = items.filter((item) => String(item.id) !== String(id));
-    if (count > 0) next.push({ id, count });
+    const nextCount = sanitizeFixedCount(count);
+    if (nextCount > 0) next.push({ id, count: nextCount });
     onChange(next);
+  }
+
+  function setRangeQuantity(id: RowId, min: number, max: number) {
+    const next = items.filter((item) => String(item.id) !== String(id));
+    const minCount = sanitizeRangeCount(min);
+    const maxCount = Math.max(minCount, sanitizeRangeCount(max));
+    next.push({
+      id,
+      count: maxCount,
+      quantity_mode: 'range',
+      min_count: minCount,
+      max_count: maxCount,
+    });
+    onChange(next);
+  }
+
+  function enableRange(id: RowId) {
+    const item = itemFor(id);
+    const base = sanitizeRangeCount(item?.count ?? item?.max_count ?? 1);
+    setRangeQuantity(id, item?.min_count ?? base, item?.max_count ?? base);
+  }
+
+  function disableRange(id: RowId) {
+    const item = itemFor(id);
+    const count = sanitizeFixedCount(item?.max_count ?? item?.count ?? 0);
+    setFixedQuantity(id, count);
   }
 
   return (
     <View style={styles.tradeItemEditor}>
       <Text style={styles.sectionLabel}>{title}</Text>
+      {!allowRange ? (
+        <Text style={styles.rangeHint}>成約・取引完了では数量を固定してください。</Text>
+      ) : null}
       {goods.length ? (
         goods.map((good) => {
-          const quantity = quantityFor(good.id);
+          const item = itemFor(good.id);
+          const ranged = item ? isRangeTradeItem(item) : false;
+          const fixedQuantity = ranged ? sanitizeFixedCount(item?.max_count ?? item?.count) : sanitizeFixedCount(item?.count);
+          const minQuantity = item && ranged ? sanitizeRangeCount(item.min_count ?? item.count) : 1;
+          const maxQuantity = item && ranged
+            ? Math.max(minQuantity, sanitizeRangeCount(item.max_count ?? item.count))
+            : Math.max(1, fixedQuantity);
+
           return (
             <View key={`${title}-${good.id}`} style={styles.goodsPickRow}>
               <View style={styles.goodsPickTextBlock}>
                 <Text style={styles.goodsPickType}>{good.type}</Text>
                 <Text style={styles.goodsPickName}>{good.char}</Text>
               </View>
-              <QuantityStepper value={quantity} onChange={(next) => setQuantity(good.id, next)} />
+              <View style={styles.goodsPickControls}>
+                {ranged ? (
+                  <View style={styles.rangeControlBox}>
+                    <View style={styles.rangeStepperRow}>
+                      <Text style={styles.rangeStepperLabel}>最小</Text>
+                      <QuantityStepper
+                        value={minQuantity}
+                        min={1}
+                        onChange={(next) => setRangeQuantity(good.id, next, Math.max(next, maxQuantity))}
+                      />
+                    </View>
+                    <View style={styles.rangeStepperRow}>
+                      <Text style={styles.rangeStepperLabel}>最大</Text>
+                      <QuantityStepper
+                        value={maxQuantity}
+                        min={minQuantity}
+                        onChange={(next) => setRangeQuantity(good.id, minQuantity, next)}
+                      />
+                    </View>
+                    <AppButton label="固定数に戻す" variant="ghost" onPress={() => disableRange(good.id)} />
+                  </View>
+                ) : (
+                  <>
+                    <QuantityStepper value={fixedQuantity} onChange={(next) => setFixedQuantity(good.id, next)} />
+                    {allowRange ? (
+                      <AppButton label="範囲を指定" variant="secondary" onPress={() => enableRange(good.id)} />
+                    ) : null}
+                  </>
+                )}
+              </View>
             </View>
           );
         })
@@ -1265,6 +1396,10 @@ function TradeItemEditor({
 
 function canManageProgress(status: TradeStatus) {
   return progressStatuses.includes(status);
+}
+
+function requiresFixedQuantity(status: TradeStatus) {
+  return status === '成約' || status === '取引完了';
 }
 
 function isTradeProgressComplete(flags: Pick<Trade, 'is_packed' | 'is_sent' | 'is_received'>) {
@@ -1410,7 +1545,7 @@ function formatTradeItemsForSummary(items: TradeItem[], goods: GoodsItem[]) {
     .map((item) => {
       const good = goods.find((candidate) => String(candidate.id) === String(item.id));
       const label = good ? `${good.type}/${good.char}` : `ID:${item.id}`;
-      return `${label} x${item.count}`;
+      return `${label} ${formatTradeItemQuantity(item)}`;
     })
     .join(', ');
 }
@@ -1457,13 +1592,15 @@ async function syncStockAfterTradeChange(
 
     if (trade.is_sent) {
       for (const item of trade.give_items ?? []) {
-        addActualDelta(item.id, -item.count * direction);
+        const count = getFixedTradeItemCount(item);
+        if (count) addActualDelta(item.id, -count * direction);
       }
     }
 
     if (trade.is_received) {
       for (const item of trade.receive_items ?? []) {
-        addActualDelta(item.id, item.count * direction);
+        const count = getFixedTradeItemCount(item);
+        if (count) addActualDelta(item.id, count * direction);
       }
     }
   };
@@ -1954,12 +2091,14 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     justifyContent: 'space-between',
     paddingTop: 10,
   },
   goodsPickTextBlock: {
     flex: 1,
+    minWidth: 150,
   },
   goodsPickType: {
     color: colors.primary,
@@ -1971,6 +2110,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     marginTop: 2,
+  },
+  goodsPickControls: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  rangeControlBox: {
+    alignItems: 'stretch',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 8,
+    gap: 8,
+    padding: 10,
+  },
+  rangeStepperRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  rangeStepperLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '900',
+    minWidth: 34,
+  },
+  rangeHint: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
   },
   memoInput: {
     minHeight: 90,

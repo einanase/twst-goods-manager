@@ -20,6 +20,9 @@ export type TradeType = '交換' | '譲渡' | '交換+譲渡';
 export type TradeItem = {
   id: RowId;
   count: number;
+  quantity_mode?: 'fixed' | 'range';
+  min_count?: number | null;
+  max_count?: number | null;
 };
 
 export type Trade = {

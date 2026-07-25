@@ -1,4 +1,5 @@
 import type { RowId, Trade } from '../types/domain';
+import { getFixedTradeItemCount } from './tradeItemQuantity';
 
 export function calculatePendingStockDiff(itemId: RowId, trades: Trade[]) {
   const targetId = String(itemId);
@@ -8,10 +9,12 @@ export function calculatePendingStockDiff(itemId: RowId, trades: Trade[]) {
     if (trade.status !== '成約') continue;
 
     const give = (trade.give_items ?? []).find((item) => String(item.id) === targetId);
-    if (give && !trade.is_sent) pendingDiff -= give.count;
+    const giveCount = give ? getFixedTradeItemCount(give) : null;
+    if (giveCount && !trade.is_sent) pendingDiff -= giveCount;
 
     const receive = (trade.receive_items ?? []).find((item) => String(item.id) === targetId);
-    if (receive && !trade.is_received) pendingDiff += receive.count;
+    const receiveCount = receive ? getFixedTradeItemCount(receive) : null;
+    if (receiveCount && !trade.is_received) pendingDiff += receiveCount;
   }
 
   return pendingDiff;
