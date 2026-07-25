@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,8 +20,8 @@ await copyFile(appIconPath, pwaIconPath);
 await writeManifest();
 await writeOfflinePage();
 await writeServiceWorker();
-await writeSitesWorker();
 await patchHtml();
+await writeSitesWorker();
 
 async function writeManifest() {
   const manifest = {
@@ -168,7 +168,51 @@ async function writeSitesWorker() {
   const serverDir = path.join(distDir, 'server');
   await mkdir(serverDir, { recursive: true });
 
-  const worker = `function withSecurityHeaders(response) {
+  const assets = await collectWorkerAssets(distDir);
+  const worker = `const ASSETS = ${JSON.stringify(assets, null, 2)};
+
+const CONTENT_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.ico': 'image/x-icon',
+  '.png': 'image/png',
+};
+
+function contentTypeFor(pathname) {
+  const match = pathname.match(/\\.[^.\\/]+$/);
+  return CONTENT_TYPES[match?.[0] ?? ''] ?? 'application/octet-stream';
+}
+
+function decodeBase64(value) {
+  const raw = atob(value);
+  const bytes = new Uint8Array(raw.length);
+  for (let index = 0; index < raw.length; index += 1) {
+    bytes[index] = raw.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function assetResponse(pathname, status = 200) {
+  const asset = ASSETS[pathname];
+  if (!asset) return null;
+
+  const body = asset.encoding === 'base64' ? decodeBase64(asset.body) : asset.body;
+  const headers = new Headers({
+    'Content-Type': contentTypeFor(pathname),
+  });
+
+  if (pathname !== '/index.html' && pathname !== '/sw.js') {
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  } else {
+    headers.set('Cache-Control', 'no-cache');
+  }
+
+  return withSecurityHeaders(new Response(body, { status, headers }));
+}
+
+function withSecurityHeaders(response) {
   const headers = new Headers(response.headers);
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   headers.set('X-Content-Type-Options', 'nosniff');
@@ -180,34 +224,53 @@ async function writeSitesWorker() {
   });
 }
 
-function asAssetRequest(pathname, request) {
-  const url = new URL(request.url);
-  url.pathname = pathname;
-  url.search = '';
-  return new Request(url, request);
-}
-
 export default {
-  async fetch(request, env) {
-    if (!env.ASSETS) {
-      return new Response('Missing static asset binding.', { status: 500 });
-    }
-
-    const response = await env.ASSETS.fetch(request);
-    if (response.status !== 404) return withSecurityHeaders(response);
+  async fetch(request) {
+    const url = new URL(request.url);
+    const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
+    const direct = assetResponse(pathname);
+    if (direct) return direct;
 
     const acceptsHtml = request.headers.get('accept')?.includes('text/html');
     if (request.method === 'GET' && acceptsHtml) {
-      const fallback = await env.ASSETS.fetch(asAssetRequest('/index.html', request));
-      return withSecurityHeaders(fallback);
+      return assetResponse('/index.html');
     }
 
-    return withSecurityHeaders(response);
+    return new Response('Not Found', { status: 404 });
   },
 };
 `;
 
   await writeFile(path.join(serverDir, 'index.js'), worker, 'utf8');
+}
+
+async function collectWorkerAssets(rootDir) {
+  const assets = {};
+  await visit(rootDir);
+  return assets;
+
+  async function visit(currentDir) {
+    const entries = await readdir(currentDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const entryPath = path.join(currentDir, entry.name);
+      if (entryPath.includes(`${path.sep}server${path.sep}`)) continue;
+
+      if (entry.isDirectory()) {
+        await visit(entryPath);
+        continue;
+      }
+
+      const publicPath = `/${path.relative(rootDir, entryPath).replace(/\\/g, '/')}`;
+      const ext = path.extname(entryPath).toLowerCase();
+      const binary = ['.png', '.ico'].includes(ext);
+      const body = await readFile(entryPath, binary ? undefined : 'utf8');
+      assets[publicPath] = {
+        encoding: binary ? 'base64' : 'text',
+        body: binary ? body.toString('base64') : body,
+      };
+    }
+  }
 }
 
 async function patchHtml() {
