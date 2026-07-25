@@ -10,6 +10,8 @@
     "web": "expo start --web",
     "build": "npm run build:web",
     "build:web": "expo export --platform web --output-dir dist && node scripts/prepare-pwa-export.mjs",
+    "build:web:hosted": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-web-hosted.ps1 dist",
+    "build:web:wife": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-web-profile.ps1 wife dist-wife",
     "typecheck": "tsc --noEmit",
     "fix-deps": "expo install --fix",
     "generate-brand-assets": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/generate-brand-assets.ps1",

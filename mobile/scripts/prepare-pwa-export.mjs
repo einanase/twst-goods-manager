@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDir, '..');
-const distDir = path.join(projectRoot, 'dist');
+const distDir = path.resolve(projectRoot, process.env.PWA_DIST_DIR ?? 'dist');
 const appIconPath = path.join(projectRoot, 'assets', 'app', 'icon.png');
 const pwaIconPath = path.join(distDir, 'pwa-icon.png');
 
@@ -18,6 +18,7 @@ const brand = {
 
 await copyFile(appIconPath, pwaIconPath);
 await writeManifest();
+await writeHomeManifest();
 await writeOfflinePage();
 await writeServiceWorker();
 await patchHtml();
@@ -48,6 +49,37 @@ async function writeManifest() {
 
   await writeFile(
     path.join(distDir, 'manifest.webmanifest'),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    'utf8',
+  );
+}
+
+async function writeHomeManifest() {
+  const manifest = {
+    id: '/home',
+    name: `${brand.name} - ${brand.subtitle}`,
+    short_name: brand.name,
+    description: brand.description,
+    lang: 'ja',
+    start_url: '/home',
+    scope: '/',
+    display: 'standalone',
+    orientation: 'portrait',
+    theme_color: brand.themeColor,
+    background_color: brand.backgroundColor,
+    icons: [
+      {
+        src: '/pwa-icon.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any maskable',
+      },
+    ],
+  };
+
+  await mkdir(path.join(distDir, 'home'), { recursive: true });
+  await writeFile(
+    path.join(distDir, 'home', 'manifest.webmanifest'),
     `${JSON.stringify(manifest, null, 2)}\n`,
     'utf8',
   );
@@ -212,6 +244,24 @@ function assetResponse(pathname, status = 200) {
   return withSecurityHeaders(new Response(body, { status, headers }));
 }
 
+function appShellResponse(pathname) {
+  const asset = ASSETS['/index.html'];
+  if (!asset) return null;
+
+  let body = asset.body;
+  if (pathname === '/home' || pathname.startsWith('/home/')) {
+    body = body.replace('href="/manifest.webmanifest"', 'href="/home/manifest.webmanifest"');
+  }
+
+  return withSecurityHeaders(new Response(body, {
+    status: 200,
+    headers: {
+      'Cache-Control': 'no-cache',
+      'Content-Type': 'text/html; charset=utf-8',
+    },
+  }));
+}
+
 function withSecurityHeaders(response) {
   const headers = new Headers(response.headers);
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -228,16 +278,18 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
     const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
+    if (pathname === '/index.html') return appShellResponse(url.pathname);
+
     const direct = assetResponse(pathname);
     if (direct) return direct;
 
     if (request.method === 'GET' && !pathname.split('/').pop()?.includes('.')) {
-      return assetResponse('/index.html');
+      return appShellResponse(pathname);
     }
 
     const acceptsHtml = request.headers.get('accept')?.includes('text/html');
     if (request.method === 'GET' && acceptsHtml) {
-      return assetResponse('/index.html');
+      return appShellResponse(pathname);
     }
 
     return new Response('Not Found', { status: 404 });
