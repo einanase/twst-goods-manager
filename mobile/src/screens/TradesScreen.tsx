@@ -1396,6 +1396,7 @@ function TradeItemEditor({
           <View style={styles.rangeStepperRow}>
             <Text style={styles.rangeStepperLabel}>最小</Text>
             <QuantityStepper
+              fill
               value={minQuantity}
               min={1}
               onChange={(next) => setRangeQuantity(id, next, Math.max(next, maxQuantity))}
@@ -1404,6 +1405,7 @@ function TradeItemEditor({
           <View style={styles.rangeStepperRow}>
             <Text style={styles.rangeStepperLabel}>最大</Text>
             <QuantityStepper
+              fill
               value={maxQuantity}
               min={minQuantity}
               onChange={(next) => setRangeQuantity(id, minQuantity, next)}
@@ -1416,7 +1418,7 @@ function TradeItemEditor({
 
     return (
       <View style={styles.fixedQuantityControls}>
-        <QuantityStepper value={fixedQuantity} onChange={(next) => setFixedQuantity(id, next)} />
+        <QuantityStepper fill value={fixedQuantity} onChange={(next) => setFixedQuantity(id, next)} />
         {allowRange ? (
           <AppButton label="範囲を指定" variant="secondary" onPress={() => enableRange(id)} />
         ) : null}
@@ -1450,14 +1452,16 @@ function TradeItemEditor({
       {selectedEntries.length ? (
         selectedEntries.map(({ item, good }) => (
           <View key={`${title}-${item.id}`} style={styles.goodsPickRow}>
-            <View style={styles.goodsPickTextBlock}>
-              <Text style={styles.goodsPickType}>{good?.type ?? '在庫'}</Text>
-              <Text style={styles.goodsPickName}>{good ? good.char : `ID:${item.id}`}</Text>
-              <Text style={styles.selectedQuantityText}>{formatTradeItemQuantity(item)}</Text>
+            <View style={styles.goodsPickHeaderRow}>
+              <View style={styles.goodsPickTextBlock}>
+                <Text style={styles.goodsPickType}>{good?.type ?? '在庫'}</Text>
+                <Text style={styles.goodsPickName}>{good ? good.char : `ID:${item.id}`}</Text>
+                <Text style={styles.selectedQuantityText}>{formatTradeItemQuantity(item)}</Text>
+              </View>
+              <AppButton label="外す" variant="ghost" onPress={() => removeItem(item.id)} />
             </View>
             <View style={styles.goodsPickControls}>
               {renderQuantityControls(item.id, item)}
-              <AppButton label="外す" variant="ghost" onPress={() => removeItem(item.id)} />
             </View>
           </View>
         ))
@@ -1486,22 +1490,21 @@ function TradeItemEditor({
                   const selected = Boolean(selectedItem);
                   return (
                     <View key={`${title}-picker-${good.id}`} style={styles.itemPickerRow}>
-                      {good.image_display_url ? (
-                        <Image source={{ uri: good.image_display_url }} style={styles.itemPickerImage} />
-                      ) : (
-                        <View style={styles.itemPickerImagePlaceholder}>
-                          <Text style={styles.placeholderText}>No Image</Text>
+                      <View style={styles.itemPickerMainRow}>
+                        {good.image_display_url ? (
+                          <Image source={{ uri: good.image_display_url }} style={styles.itemPickerImage} />
+                        ) : (
+                          <View style={styles.itemPickerImagePlaceholder}>
+                            <Text style={styles.placeholderText}>No Image</Text>
+                          </View>
+                        )}
+                        <View style={styles.itemPickerTextBlock}>
+                          <Text style={styles.goodsPickType}>{good.type}</Text>
+                          <Text style={styles.goodsPickName}>{good.char}</Text>
+                          {selectedItem ? (
+                            <Text style={styles.selectedQuantityText}>{formatTradeItemQuantity(selectedItem)}</Text>
+                          ) : null}
                         </View>
-                      )}
-                      <View style={styles.itemPickerTextBlock}>
-                        <Text style={styles.goodsPickType}>{good.type}</Text>
-                        <Text style={styles.goodsPickName}>{good.char}</Text>
-                        {selectedItem ? (
-                          <Text style={styles.selectedQuantityText}>{formatTradeItemQuantity(selectedItem)}</Text>
-                        ) : null}
-                      </View>
-                      <View style={styles.itemPickerActions}>
-                        {selectedItem ? renderQuantityControls(good.id, selectedItem) : null}
                         <AppButton
                           label={selected ? '外す' : '追加'}
                           variant={selected ? 'ghost' : 'secondary'}
@@ -1511,6 +1514,11 @@ function TradeItemEditor({
                           }}
                         />
                       </View>
+                      {selectedItem ? (
+                        <View style={styles.itemPickerSelectedControls}>
+                          {renderQuantityControls(good.id, selectedItem)}
+                        </View>
+                      ) : null}
                     </View>
                   );
                 })
@@ -2225,18 +2233,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   goodsPickRow: {
-    alignItems: 'center',
+    alignItems: 'stretch',
     borderTopColor: colors.border,
     borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+    minWidth: 0,
+    paddingTop: 10,
+    width: '100%',
+  },
+  goodsPickHeaderRow: {
+    alignItems: 'flex-start',
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 10,
     justifyContent: 'space-between',
-    paddingTop: 10,
+    minWidth: 0,
+    width: '100%',
   },
   goodsPickTextBlock: {
     flex: 1,
-    minWidth: 150,
+    minWidth: 0,
   },
   goodsPickType: {
     color: colors.primary,
@@ -2250,10 +2265,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   goodsPickControls: {
-    alignItems: 'flex-end',
-    flexShrink: 1,
+    alignItems: 'stretch',
     gap: 8,
+    minWidth: 0,
     maxWidth: '100%',
+    width: '100%',
   },
   selectedQuantityText: {
     color: colors.muted,
@@ -2299,15 +2315,22 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   itemPickerRow: {
-    alignItems: 'center',
+    alignItems: 'stretch',
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 10,
+    minWidth: 0,
     padding: 10,
+    width: '100%',
+  },
+  itemPickerMainRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    minWidth: 0,
+    width: '100%',
   },
   itemPickerImage: {
     backgroundColor: colors.surfaceMuted,
@@ -2325,35 +2348,38 @@ const styles = StyleSheet.create({
   },
   itemPickerTextBlock: {
     flex: 1,
-    minWidth: 150,
+    minWidth: 0,
   },
-  itemPickerActions: {
-    alignItems: 'flex-end',
-    flexShrink: 1,
+  itemPickerSelectedControls: {
+    alignItems: 'stretch',
     gap: 8,
-    marginLeft: 'auto',
     maxWidth: '100%',
+    minWidth: 0,
+    width: '100%',
   },
   fixedQuantityControls: {
-    alignItems: 'flex-end',
-    flexShrink: 1,
+    alignItems: 'stretch',
     gap: 8,
     maxWidth: '100%',
+    minWidth: 0,
+    width: '100%',
   },
   rangeControlBox: {
     alignItems: 'stretch',
     backgroundColor: colors.surfaceMuted,
     borderRadius: 8,
-    flexShrink: 1,
     gap: 8,
     maxWidth: '100%',
+    minWidth: 0,
     padding: 10,
+    width: '100%',
   },
   rangeStepperRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'space-between',
+    minWidth: 0,
   },
   rangeStepperLabel: {
     color: colors.muted,

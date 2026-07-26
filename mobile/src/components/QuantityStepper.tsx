@@ -6,9 +6,10 @@ type QuantityStepperProps = {
   value: number;
   onChange: (nextValue: number) => void;
   min?: number;
+  fill?: boolean;
 };
 
-export function QuantityStepper({ value, onChange, min = 0 }: QuantityStepperProps) {
+export function QuantityStepper({ value, onChange, min = 0, fill = false }: QuantityStepperProps) {
   const [draftValue, setDraftValue] = useState(String(value));
   const [editing, setEditing] = useState(false);
 
@@ -45,7 +46,7 @@ export function QuantityStepper({ value, onChange, min = 0 }: QuantityStepperPro
   }
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, fill ? styles.fillWrap : null]}>
       <Pressable
         accessibilityRole="button"
         onPress={(event) => {
@@ -68,7 +69,7 @@ export function QuantityStepper({ value, onChange, min = 0 }: QuantityStepperPro
         }}
         onPressIn={(event) => event.stopPropagation()}
         selectTextOnFocus
-        style={styles.valueInput}
+        style={[styles.valueInput, fill ? styles.fillValueInput : null]}
         value={editing ? draftValue : String(value)}
       />
       <Pressable
@@ -92,6 +93,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     gap: 8,
     maxWidth: '100%',
+  },
+  fillWrap: {
+    width: '100%',
   },
   control: {
     alignItems: 'center',
@@ -121,5 +125,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     textAlign: 'center',
     width: 88,
+  },
+  fillValueInput: {
+    flex: 1,
+    maxWidth: '100%',
+    minWidth: 0,
+    width: 0,
   },
 });
