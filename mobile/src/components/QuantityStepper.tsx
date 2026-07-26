@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors } from '../lib/theme';
 
 type QuantityStepperProps = {
@@ -8,6 +9,41 @@ type QuantityStepperProps = {
 };
 
 export function QuantityStepper({ value, onChange, min = 0 }: QuantityStepperProps) {
+  const [draftValue, setDraftValue] = useState(String(value));
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!editing) {
+      setDraftValue(String(value));
+    }
+  }, [editing, value]);
+
+  function normalizeInput(input: string) {
+    return input
+      .replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
+      .replace(/[^\d]/g, '');
+  }
+
+  function applyInput(input: string) {
+    const normalized = normalizeInput(input);
+    if (!normalized) {
+      setDraftValue('');
+      return;
+    }
+
+    const nextValue = Math.max(min, Math.trunc(Number(normalized) || 0));
+    setDraftValue(String(nextValue));
+    onChange(nextValue);
+  }
+
+  function finishEditing() {
+    setEditing(false);
+    if (!draftValue) {
+      setDraftValue(String(min));
+      onChange(min);
+    }
+  }
+
   return (
     <View style={styles.wrap}>
       <Pressable
@@ -17,7 +53,20 @@ export function QuantityStepper({ value, onChange, min = 0 }: QuantityStepperPro
       >
         <Text style={styles.controlText}>-</Text>
       </Pressable>
-      <Text style={styles.value}>{value}</Text>
+      <TextInput
+        accessibilityLabel="数量を入力"
+        inputMode="numeric"
+        keyboardType="number-pad"
+        onBlur={finishEditing}
+        onChangeText={applyInput}
+        onFocus={() => {
+          setEditing(true);
+          setDraftValue(String(value));
+        }}
+        selectTextOnFocus
+        style={styles.valueInput}
+        value={editing ? draftValue : String(value)}
+      />
       <Pressable accessibilityRole="button" onPress={() => onChange(value + 1)} style={styles.control}>
         <Text style={styles.controlText}>+</Text>
       </Pressable>
@@ -45,12 +94,17 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 22,
   },
-  value: {
+  valueInput: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
     color: colors.text,
     fontSize: 16,
     fontWeight: '900',
-    minWidth: 26,
+    height: 36,
+    minWidth: 52,
+    paddingHorizontal: 8,
     textAlign: 'center',
   },
 });
-
