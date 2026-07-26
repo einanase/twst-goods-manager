@@ -1460,7 +1460,8 @@ function TradeItemEditor({
             <ScrollView style={styles.itemPickerList} contentContainerStyle={styles.itemPickerListContent}>
               {filteredGoods.length ? (
                 filteredGoods.map((good) => {
-                  const selected = Boolean(itemFor(good.id));
+                  const selectedItem = itemFor(good.id);
+                  const selected = Boolean(selectedItem);
                   return (
                     <View key={`${title}-picker-${good.id}`} style={styles.itemPickerRow}>
                       {good.image_display_url ? (
@@ -1473,20 +1474,21 @@ function TradeItemEditor({
                       <View style={styles.itemPickerTextBlock}>
                         <Text style={styles.goodsPickType}>{good.type}</Text>
                         <Text style={styles.goodsPickName}>{good.char}</Text>
-                        {selected ? (
-                          <Text style={styles.selectedQuantityText}>
-                            {formatTradeItemQuantity(itemFor(good.id) as TradeItem)}
-                          </Text>
+                        {selectedItem ? (
+                          <Text style={styles.selectedQuantityText}>{formatTradeItemQuantity(selectedItem)}</Text>
                         ) : null}
                       </View>
-                      <AppButton
-                        label={selected ? '外す' : '追加'}
-                        variant={selected ? 'ghost' : 'secondary'}
-                        onPress={() => {
-                          if (selected) removeItem(good.id);
-                          else addItem(good.id);
-                        }}
-                      />
+                      <View style={styles.itemPickerActions}>
+                        {selectedItem ? renderQuantityControls(good.id, selectedItem) : null}
+                        <AppButton
+                          label={selected ? '外す' : '追加'}
+                          variant={selected ? 'ghost' : 'secondary'}
+                          onPress={() => {
+                            if (selected) removeItem(good.id);
+                            else addItem(good.id);
+                          }}
+                        />
+                      </View>
                     </View>
                   );
                 })
@@ -2279,6 +2281,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     padding: 10,
   },
@@ -2298,7 +2301,12 @@ const styles = StyleSheet.create({
   },
   itemPickerTextBlock: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 150,
+  },
+  itemPickerActions: {
+    alignItems: 'flex-end',
+    gap: 8,
+    marginLeft: 'auto',
   },
   rangeControlBox: {
     alignItems: 'stretch',
