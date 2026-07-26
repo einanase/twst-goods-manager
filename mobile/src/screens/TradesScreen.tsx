@@ -1395,21 +1395,25 @@ function TradeItemEditor({
         <View style={styles.rangeControlBox}>
           <View style={styles.rangeStepperRow}>
             <Text style={styles.rangeStepperLabel}>最小</Text>
-            <QuantityStepper
-              fill
-              value={minQuantity}
-              min={1}
-              onChange={(next) => setRangeQuantity(id, next, Math.max(next, maxQuantity))}
-            />
+            <View style={styles.rangeStepperControl}>
+              <QuantityStepper
+                fill
+                value={minQuantity}
+                min={1}
+                onChange={(next) => setRangeQuantity(id, next, Math.max(next, maxQuantity))}
+              />
+            </View>
           </View>
           <View style={styles.rangeStepperRow}>
             <Text style={styles.rangeStepperLabel}>最大</Text>
-            <QuantityStepper
-              fill
-              value={maxQuantity}
-              min={minQuantity}
-              onChange={(next) => setRangeQuantity(id, minQuantity, next)}
-            />
+            <View style={styles.rangeStepperControl}>
+              <QuantityStepper
+                fill
+                value={maxQuantity}
+                min={minQuantity}
+                onChange={(next) => setRangeQuantity(id, minQuantity, next)}
+              />
+            </View>
           </View>
           <AppButton label="固定数に戻す" variant="ghost" onPress={() => disableRange(id)} />
         </View>
@@ -2379,6 +2383,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'space-between',
+    minWidth: 0,
+  },
+  rangeStepperControl: {
+    flex: 1,
     minWidth: 0,
   },
   rangeStepperLabel: {
