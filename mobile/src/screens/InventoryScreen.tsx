@@ -32,6 +32,7 @@ import {
 } from '../lib/stockProjection';
 import { colors } from '../lib/theme';
 import { formatTradeItemQuantity } from '../lib/tradeItemQuantity';
+import { formatTradeNumber } from '../lib/tradeNumber';
 import type { GoodsItem, RowId, Trade, TradeItem, TradeStatus } from '../types/domain';
 import {
   createGoods,
@@ -846,11 +847,13 @@ function PlannedTradesModal({
               <PlannedDirectionSection
                 groups={groups.give}
                 onOpenTrade={onOpenTrade}
+                trades={trades}
                 title="渡すもの"
               />
               <PlannedDirectionSection
                 groups={groups.receive}
                 onOpenTrade={onOpenTrade}
+                trades={trades}
                 title="受けるもの"
               />
             </>
@@ -871,10 +874,12 @@ function PlannedTradesModal({
 function PlannedDirectionSection({
   title,
   groups,
+  trades,
   onOpenTrade,
 }: {
   title: string;
   groups: Record<PlannedTradeStatus, PlannedTradeEntry[]>;
+  trades: Trade[];
   onOpenTrade: (tradeId: RowId) => void;
 }) {
   const hasEntries = plannedTradeStatuses.some((status) => groups[status].length > 0);
@@ -898,7 +903,9 @@ function PlannedDirectionSection({
                 style={styles.plannedTradeRow}
               >
                 <View style={styles.plannedTradeTextBlock}>
-                  <Text style={styles.plannedTradeName}>{entry.trade.name}</Text>
+                  <Text style={styles.plannedTradeName}>
+                    {formatTradeNumber(trades, entry.trade.id)} {entry.trade.name}
+                  </Text>
                   <Text style={styles.plannedTradeQuantity}>{formatTradeItemQuantity(entry.item)}</Text>
                 </View>
                 <Text style={styles.plannedTradeOpenText}>開く</Text>

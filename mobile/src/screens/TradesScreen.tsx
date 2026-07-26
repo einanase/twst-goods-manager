@@ -37,6 +37,7 @@ import {
   sanitizeFixedCount,
   sanitizeRangeCount,
 } from '../lib/tradeItemQuantity';
+import { formatTradeNumber } from '../lib/tradeNumber';
 import { loadGoods, updateGoodsStock } from '../services/goodsService';
 import { createTrade, deleteTrade, loadTrades, patchTrade, updateTrade } from '../services/tradeService';
 import { getStoredImageValue, removeStoredImage, uploadPrivateImageFromUri } from '../services/imageStorage';
@@ -728,11 +729,11 @@ export function TradesScreen({ userId, onTradesChanged, openTradeRequest }: Trad
             <EmptyState title="取引がありません" body="取引相手、渡すもの、受けるもの、発送状況を記録できます。" />
           )
         }
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
             <Pressable style={styles.card} onPress={() => openEdit(item)}>
               <View style={styles.cardTop}>
                 <View style={styles.tradeTitleBlock}>
-                  <Text style={styles.tradeNo}>#{filteredTrades.length - index}</Text>
+                  <Text style={styles.tradeNo}>{formatTradeNumber(trades, item.id)}</Text>
                   <Text style={styles.tradeName}>{item.name}</Text>
                 </View>
                 <AppButton label="削除" variant="danger" onPress={() => confirmDelete(item)} />
