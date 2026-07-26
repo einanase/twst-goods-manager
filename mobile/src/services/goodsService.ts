@@ -71,6 +71,24 @@ export async function updateGoodsStock(
   if (error) throw error;
 }
 
+export async function updateGoodsSortOrders(
+  userId: string,
+  updates: Array<{ id: RowId; sort_order: number }>,
+) {
+  const supabase = getSupabase();
+  const results = await Promise.all(
+    updates.map(({ id, sort_order }) =>
+      supabase
+        .from('goods')
+        .update({ sort_order })
+        .eq('id', id)
+        .eq('user_id', userId),
+    ),
+  );
+  const failed = results.find((result) => result.error);
+  if (failed?.error) throw failed.error;
+}
+
 export async function deleteGoods(userId: string, id: RowId) {
   const { error } = await getSupabase().from('goods').delete().eq('id', id).eq('user_id', userId);
   if (error) throw error;

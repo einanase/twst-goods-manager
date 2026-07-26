@@ -23,8 +23,15 @@ import { QuantityStepper } from '../components/QuantityStepper';
 import { TextField } from '../components/TextField';
 import { calculatePlannedStockCount } from '../lib/stockProjection';
 import { colors } from '../lib/theme';
-import type { GoodsItem } from '../types/domain';
-import { createGoods, deleteGoods, loadGoods, updateGoods, updateGoodsStock } from '../services/goodsService';
+import type { GoodsItem, RowId } from '../types/domain';
+import {
+  createGoods,
+  deleteGoods,
+  loadGoods,
+  updateGoods,
+  updateGoodsSortOrders,
+  updateGoodsStock,
+} from '../services/goodsService';
 import { getStoredImageValue, removeStoredImage, uploadPrivateImageFromUri } from '../services/imageStorage';
 import { loadTrades } from '../services/tradeService';
 
@@ -48,11 +55,44 @@ type PendingCropImage = {
   fileName: string | null;
 } | null;
 
+type DropPlacement = 'before' | 'after';
+
+type WebDragEvent = {
+  clientY?: number;
+  currentTarget?: {
+    getBoundingClientRect?: () => { top: number; height: number };
+  };
+  dataTransfer?: {
+    dropEffect?: string;
+    effectAllowed?: string;
+    getData?: (format: string) => string;
+    setData?: (format: string, data: string) => void;
+  };
+  nativeEvent?: {
+    clientY?: number;
+  };
+  preventDefault?: () => void;
+  stopPropagation?: () => void;
+};
+
+type WebDragProps = {
+  draggable?: boolean;
+  onDragEnd?: () => void;
+  onDragOver?: (event: WebDragEvent) => void;
+  onDragStart?: (event: WebDragEvent) => void;
+  onDrop?: (event: WebDragEvent) => void;
+};
+
 export function InventoryScreen({ userId }: InventoryScreenProps) {
   const [items, setItems] = useState<GoodsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [reorderMode, setReorderMode] = useState(false);
+  const [reorderSaving, setReorderSaving] = useState(false);
+  const [draggingItemId, setDraggingItemId] = useState<RowId | null>(null);
+  const [dragOverItemId, setDragOverItemId] = useState<RowId | null>(null);
+  const [dragOverPlacement, setDragOverPlacement] = useState<DropPlacement | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<GoodsItem | null>(null);
   const [type, setType] = useState('');
@@ -99,6 +139,18 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const hasSearch = search.trim().length > 0;
+  const canUseReorderMode = Platform.OS === 'web' && !hasSearch && items.length > 1;
+  const canDragReorder = canUseReorderMode && reorderMode && !loading && !saving && !reorderSaving;
+
+  useEffect(() => {
+    if (!hasSearch) return;
+    setReorderMode(false);
+    setDraggingItemId(null);
+    setDragOverItemId(null);
+    setDragOverPlacement(null);
+  }, [hasSearch]);
 
   const filteredItems = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -318,6 +370,95 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
     }
   }
 
+  function toggleReorderMode() {
+    setDraggingItemId(null);
+    setDragOverItemId(null);
+    setDragOverPlacement(null);
+    setReorderMode((current) => !current);
+  }
+
+  function getDropPlacement(event: WebDragEvent): DropPlacement {
+    const clientY = event.clientY ?? event.nativeEvent?.clientY;
+    const bounds = event.currentTarget?.getBoundingClientRect?.();
+    if (typeof clientY !== 'number' || !bounds) return 'after';
+    return clientY > bounds.top + bounds.height / 2 ? 'after' : 'before';
+  }
+
+  async function persistReorderedItems(previousItems: GoodsItem[], nextItems: GoodsItem[]) {
+    setItems(nextItems);
+    setReorderSaving(true);
+
+    try {
+      await updateGoodsSortOrders(
+        userId,
+        nextItems.map((item, index) => ({ id: item.id, sort_order: index })),
+      );
+    } catch (error) {
+      setItems(previousItems);
+      const message = error instanceof Error ? error.message : String(error);
+      showNotice('並び替えを保存できませんでした', message);
+    } finally {
+      setReorderSaving(false);
+      setDraggingItemId(null);
+      setDragOverItemId(null);
+      setDragOverPlacement(null);
+    }
+  }
+
+  async function dropReorderedItem(sourceId: RowId | string, targetId: RowId, placement: DropPlacement) {
+    if (!canDragReorder || idsMatch(sourceId, targetId)) {
+      setDraggingItemId(null);
+      setDragOverItemId(null);
+      setDragOverPlacement(null);
+      return;
+    }
+
+    const nextItems = reorderGoodsItems(items, sourceId, targetId, placement);
+    if (nextItems === items) {
+      setDraggingItemId(null);
+      setDragOverItemId(null);
+      setDragOverPlacement(null);
+      return;
+    }
+
+    await persistReorderedItems(items, nextItems);
+  }
+
+  function getWebDragProps(item: GoodsItem): WebDragProps {
+    if (!canDragReorder) return {};
+
+    return {
+      draggable: true,
+      onDragStart: (event) => {
+        event.stopPropagation?.();
+        event.dataTransfer?.setData?.('text/plain', String(item.id));
+        if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+        setDraggingItemId(item.id);
+      },
+      onDragOver: (event) => {
+        const sourceId = draggingItemId ?? event.dataTransfer?.getData?.('text/plain');
+        if (!hasUsableId(sourceId) || idsMatch(sourceId, item.id)) return;
+        event.preventDefault?.();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+        const placement = getDropPlacement(event);
+        setDragOverItemId((current) => (idsMatch(current, item.id) ? current : item.id));
+        setDragOverPlacement((current) => (current === placement ? current : placement));
+      },
+      onDrop: (event) => {
+        const sourceId = draggingItemId ?? event.dataTransfer?.getData?.('text/plain');
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        if (!hasUsableId(sourceId)) return;
+        void dropReorderedItem(sourceId, item.id, getDropPlacement(event));
+      },
+      onDragEnd: () => {
+        setDraggingItemId(null);
+        setDragOverItemId(null);
+        setDragOverPlacement(null);
+      },
+    };
+  }
+
   async function confirmDelete(item: GoodsItem) {
     confirmAction('削除しますか？', `${item.type} / ${item.char} を削除します。`, [
       { text: 'キャンセル', style: 'cancel' },
@@ -349,7 +490,17 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
           placeholder="種類・品名で検索"
           style={styles.searchInput}
         />
-        <AppButton label="追加" onPress={openCreate} />
+        <View style={styles.toolbarActions}>
+          {Platform.OS === 'web' ? (
+            <AppButton
+              label={reorderSaving ? '保存中...' : reorderMode ? '完了' : '並び替え'}
+              variant="secondary"
+              disabled={loading || saving || reorderSaving || hasSearch || items.length < 2}
+              onPress={toggleReorderMode}
+            />
+          ) : null}
+          <AppButton label="追加" onPress={openCreate} />
+        </View>
       </View>
 
       {loading ? (
@@ -358,6 +509,13 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         <FlatList
           contentContainerStyle={styles.listContent}
           data={filteredItems}
+          extraData={{
+            dragOverItemId,
+            dragOverPlacement,
+            draggingItemId,
+            reorderMode,
+            reorderSaving,
+          }}
           keyExtractor={(item) => String(item.id)}
           ListEmptyComponent={
             <EmptyState title="在庫がありません" body="まずはグッズを追加して、交換に使う在庫を記録します。" />
@@ -365,14 +523,36 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
           renderItem={({ item }) => {
             const actualCount = item.count ?? 0;
             const plannedCount = item.planned_count ?? actualCount;
+            const dragProps = getWebDragProps(item);
+            const isDragging = idsMatch(draggingItemId, item.id);
+            const isDropTarget = idsMatch(dragOverItemId, item.id) && !isDragging;
 
             return (
-              <Pressable style={styles.card} onPress={() => openEdit(item)}>
+              <Pressable
+                {...dragProps}
+                style={[
+                  styles.card,
+                  reorderMode && Platform.OS === 'web' ? styles.reorderCard : null,
+                  isDragging ? styles.cardDragging : null,
+                  isDropTarget && dragOverPlacement === 'before' ? styles.cardDropBefore : null,
+                  isDropTarget && dragOverPlacement === 'after' ? styles.cardDropAfter : null,
+                ]}
+                onPress={() => {
+                  if (reorderMode) return;
+                  openEdit(item);
+                }}
+              >
+                {reorderMode && Platform.OS === 'web' ? (
+                  <View style={styles.dragHandle}>
+                    <Text style={styles.dragHandleText}>ドラッグ</Text>
+                  </View>
+                ) : null}
                 {item.image_display_url ? (
                   <Pressable
                     accessibilityRole="imagebutton"
                     onPress={(event) => {
                       event.stopPropagation();
+                      if (reorderMode) return;
                       setPreviewImage({ uri: item.image_display_url ?? '', title: `${item.type} / ${item.char}` });
                     }}
                     style={styles.imageTapArea}
@@ -399,10 +579,21 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
                   </View>
                   <View style={styles.countAdjustRow}>
                     <Text style={styles.countLabel}>実数を調整</Text>
-                    <QuantityStepper value={actualCount} onChange={(next) => changeCount(item, next)} />
+                    <QuantityStepper
+                      value={actualCount}
+                      onChange={(next) => {
+                        if (reorderMode) return;
+                        changeCount(item, next);
+                      }}
+                    />
                   </View>
                 </View>
-                <AppButton label="削除" variant="danger" onPress={() => confirmDelete(item)} />
+                <AppButton
+                  label="削除"
+                  variant="danger"
+                  disabled={reorderMode || reorderSaving}
+                  onPress={() => confirmDelete(item)}
+                />
               </Pressable>
             );
           }}
@@ -563,6 +754,34 @@ function showError(title: string, error: unknown) {
   Alert.alert(title, message);
 }
 
+function idsMatch(left: RowId | string | null | undefined, right: RowId | string | null | undefined) {
+  if (left === null || left === undefined || right === null || right === undefined) return false;
+  return String(left) === String(right);
+}
+
+function hasUsableId(value: RowId | string | null | undefined): value is RowId | string {
+  return value !== null && value !== undefined && String(value).length > 0;
+}
+
+function reorderGoodsItems(
+  items: GoodsItem[],
+  sourceId: RowId | string,
+  targetId: RowId,
+  placement: DropPlacement,
+) {
+  const sourceItem = items.find((item) => idsMatch(item.id, sourceId));
+  if (!sourceItem || idsMatch(sourceId, targetId)) return items;
+
+  const withoutSource = items.filter((item) => !idsMatch(item.id, sourceId));
+  const targetIndex = withoutSource.findIndex((item) => idsMatch(item.id, targetId));
+  if (targetIndex < 0) return items;
+
+  const insertIndex = placement === 'after' ? targetIndex + 1 : targetIndex;
+  const reordered = [...withoutSource];
+  reordered.splice(insertIndex, 0, sourceItem);
+  return reordered.map((item, index) => ({ ...item, sort_order: index }));
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -570,6 +789,12 @@ const styles = StyleSheet.create({
   toolbar: {
     gap: 10,
     padding: 16,
+  },
+  toolbarActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
   },
   searchInput: {
     minHeight: 44,
@@ -591,6 +816,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     padding: 12,
+  },
+  reorderCard: {
+    borderColor: colors.secondary,
+  },
+  cardDragging: {
+    opacity: 0.56,
+  },
+  cardDropBefore: {
+    borderTopColor: colors.primary,
+    borderTopWidth: 3,
+  },
+  cardDropAfter: {
+    borderBottomColor: colors.primary,
+    borderBottomWidth: 3,
+  },
+  dragHandle: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 8,
+    justifyContent: 'center',
+    minWidth: 58,
+    paddingHorizontal: 8,
+  },
+  dragHandleText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '900',
   },
   goodsImage: {
     backgroundColor: colors.surfaceMuted,
