@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type AlertButton,
 } from 'react-native';
@@ -55,11 +56,15 @@ type PendingCropImage = {
   fileName: string | null;
 } | null;
 
+type InventoryView = 'list' | 'gallery';
+const INVENTORY_VIEW_STORAGE_KEY = 'guttore.inventoryView';
+
 export function InventoryScreen({ userId }: InventoryScreenProps) {
   const [items, setItems] = useState<GoodsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [inventoryView, setInventoryView] = useState<InventoryView>(getInitialInventoryView);
   const [reorderMode, setReorderMode] = useState(false);
   const [reorderSaving, setReorderSaving] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -75,6 +80,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   const [cameraVisible, setCameraVisible] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [pendingCropImage, setPendingCropImage] = useState<PendingCropImage>(null);
+  const { width } = useWindowDimensions();
 
   function showNotice(title: string, message: string) {
     if (Platform.OS === 'web') {
@@ -109,8 +115,19 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(INVENTORY_VIEW_STORAGE_KEY, inventoryView);
+    } catch {
+      // 表示切替の保存に失敗しても、一覧操作自体はそのまま使える。
+    }
+  }, [inventoryView]);
+
   const hasSearch = search.trim().length > 0;
   const canUseReorderMode = !hasSearch && items.length > 1;
+  const isGalleryView = inventoryView === 'gallery';
+  const galleryColumnCount = width >= 900 ? 4 : width >= 640 ? 3 : 2;
 
   useEffect(() => {
     if (!hasSearch) return;
@@ -400,6 +417,20 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
           style={styles.searchInput}
         />
         <View style={styles.toolbarActions}>
+          <View style={styles.viewToggle}>
+            <AppButton
+              label="一覧"
+              variant={inventoryView === 'list' ? 'secondary' : 'ghost'}
+              disabled={reorderSaving}
+              onPress={() => setInventoryView('list')}
+            />
+            <AppButton
+              label="画像"
+              variant={inventoryView === 'gallery' ? 'secondary' : 'ghost'}
+              disabled={reorderSaving}
+              onPress={() => setInventoryView('gallery')}
+            />
+          </View>
           <AppButton
             label={reorderSaving ? '保存中...' : reorderMode ? '完了' : '並び替え'}
             variant="secondary"
@@ -414,19 +445,95 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         <ActivityIndicator color={colors.primary} style={styles.loader} />
       ) : (
         <FlatList
-          contentContainerStyle={styles.listContent}
+          key={isGalleryView ? `gallery-${galleryColumnCount}` : 'list'}
+          columnWrapperStyle={isGalleryView ? styles.galleryRow : undefined}
+          contentContainerStyle={[styles.listContent, isGalleryView ? styles.galleryContent : null]}
           data={filteredItems}
-          extraData={{ reorderMode, reorderSaving }}
+          extraData={{ inventoryView, reorderMode, reorderSaving, width }}
           keyExtractor={(item) => String(item.id)}
           ListEmptyComponent={
             <EmptyState title="在庫がありません" body="まずはグッズを追加して、交換に使う在庫を記録します。" />
           }
+          numColumns={isGalleryView ? galleryColumnCount : 1}
           renderItem={({ item }) => {
             const actualCount = item.count ?? 0;
             const plannedCount = item.planned_count ?? actualCount;
             const itemIndex = items.findIndex((candidate) => idsMatch(candidate.id, item.id));
             const canMoveUp = itemIndex > 0;
             const canMoveDown = itemIndex >= 0 && itemIndex < items.length - 1;
+            const actionControls = reorderMode ? (
+              <View style={styles.reorderControls}>
+                <AppButton
+                  label="上へ"
+                  variant="secondary"
+                  disabled={!canMoveUp || reorderSaving}
+                  onPress={() => moveItem(item, -1)}
+                />
+                <AppButton
+                  label="下へ"
+                  variant="secondary"
+                  disabled={!canMoveDown || reorderSaving}
+                  onPress={() => moveItem(item, 1)}
+                />
+              </View>
+            ) : (
+              <AppButton label="削除" variant="danger" onPress={() => confirmDelete(item)} />
+            );
+
+            if (isGalleryView) {
+              return (
+                <Pressable
+                  style={[styles.galleryCard, reorderMode ? styles.reorderCard : null]}
+                  onPress={() => {
+                    if (reorderMode) return;
+                    openEdit(item);
+                  }}
+                >
+                  <Pressable
+                    accessibilityRole="imagebutton"
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      if (reorderMode) return;
+                      if (item.image_display_url) {
+                        setPreviewImage({ uri: item.image_display_url, title: `${item.type} / ${item.char}` });
+                      }
+                    }}
+                    style={styles.galleryImageTapArea}
+                  >
+                    {item.image_display_url ? (
+                      <Image source={{ uri: item.image_display_url }} resizeMode="contain" style={styles.galleryImage} />
+                    ) : (
+                      <Text style={styles.imagePlaceholderText}>No Image</Text>
+                    )}
+                  </Pressable>
+                  <View style={styles.galleryBody}>
+                    <Text style={styles.itemType} numberOfLines={1}>{item.type}</Text>
+                    <Text style={styles.itemName} numberOfLines={2}>{item.char}</Text>
+                    <View style={styles.galleryCountSummary}>
+                      <View style={styles.galleryCountBadge}>
+                        <Text style={styles.countBadgeLabel}>予定数</Text>
+                        <Text style={styles.countBadgeValue}>{plannedCount}</Text>
+                      </View>
+                      <View style={styles.galleryCountBadge}>
+                        <Text style={styles.countBadgeLabel}>実数</Text>
+                        <Text style={styles.countBadgeValue}>{actualCount}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.galleryStepperRow}>
+                      <Text style={styles.countLabel}>実数</Text>
+                      <QuantityStepper
+                        value={actualCount}
+                        onChange={(next) => {
+                          if (reorderMode) return;
+                          changeCount(item, next);
+                        }}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.galleryActions}>{actionControls}</View>
+                </Pressable>
+              );
+            }
 
             return (
               <Pressable
@@ -477,24 +584,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
                     />
                   </View>
                 </View>
-                {reorderMode ? (
-                  <View style={styles.reorderControls}>
-                    <AppButton
-                      label="上へ"
-                      variant="secondary"
-                      disabled={!canMoveUp || reorderSaving}
-                      onPress={() => moveItem(item, -1)}
-                    />
-                    <AppButton
-                      label="下へ"
-                      variant="secondary"
-                      disabled={!canMoveDown || reorderSaving}
-                      onPress={() => moveItem(item, 1)}
-                    />
-                  </View>
-                ) : (
-                  <AppButton label="削除" variant="danger" onPress={() => confirmDelete(item)} />
-                )}
+                {actionControls}
               </Pressable>
             );
           }}
@@ -655,6 +745,16 @@ function showError(title: string, error: unknown) {
   Alert.alert(title, message);
 }
 
+function getInitialInventoryView(): InventoryView {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return 'list';
+  try {
+    const saved = window.localStorage.getItem(INVENTORY_VIEW_STORAGE_KEY);
+    return saved === 'gallery' ? 'gallery' : 'list';
+  } catch {
+    return 'list';
+  }
+}
+
 function idsMatch(left: RowId | string | null | undefined, right: RowId | string | null | undefined) {
   if (left === null || left === undefined || right === null || right === undefined) return false;
   return String(left) === String(right);
@@ -692,6 +792,11 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: 'flex-end',
   },
+  viewToggle: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   searchInput: {
     minHeight: 44,
   },
@@ -702,6 +807,12 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 16,
     paddingTop: 0,
+  },
+  galleryContent: {
+    gap: 10,
+  },
+  galleryRow: {
+    gap: 10,
   },
   card: {
     alignItems: 'center',
@@ -721,6 +832,54 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: 'center',
     minWidth: 72,
+  },
+  galleryCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    maxWidth: 280,
+    minWidth: 0,
+    overflow: 'hidden',
+  },
+  galleryImageTapArea: {
+    alignItems: 'center',
+    aspectRatio: 1,
+    backgroundColor: colors.surfaceMuted,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  galleryImage: {
+    height: '100%',
+    width: '100%',
+  },
+  galleryBody: {
+    gap: 8,
+    padding: 12,
+  },
+  galleryCountSummary: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  galleryCountBadge: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 8,
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  galleryStepperRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  galleryActions: {
+    paddingBottom: 12,
+    paddingHorizontal: 12,
   },
   goodsImage: {
     backgroundColor: colors.surfaceMuted,
