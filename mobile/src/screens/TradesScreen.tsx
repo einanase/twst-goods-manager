@@ -21,7 +21,11 @@ import { EmptyState } from '../components/EmptyState';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { QuantityStepper } from '../components/QuantityStepper';
 import { TextField } from '../components/TextField';
-import { calculatePlannedStockCount } from '../lib/stockProjection';
+import {
+  applyCalculatedPlannedStockRange,
+  applyPlannedStockRange,
+  calculatePlannedStockRange,
+} from '../lib/stockProjection';
 import { colors } from '../lib/theme';
 import {
   formatTradeItemQuantity,
@@ -127,7 +131,7 @@ export function TradesScreen({ userId, onTradesChanged }: TradesScreenProps) {
     setLoading(true);
     try {
       const [nextGoods, nextTrades] = await Promise.all([loadGoods(userId), loadTrades(userId)]);
-      setGoods(nextGoods);
+      setGoods(nextGoods.map((item) => applyCalculatedPlannedStockRange(item, nextTrades)));
       setTrades(nextTrades);
     } catch (error) {
       showError('取引の読み込みに失敗しました', error);
@@ -1739,11 +1743,11 @@ async function syncStockAfterTradeChange(
     const item = nextGoods[index];
     if (!item) continue;
     const actualCount = item?.count ?? 0;
-    const plannedCount = calculatePlannedStockCount(actualCount, itemId, nextTrades);
-    nextGoods[index] = { ...item, planned_count: plannedCount };
+    const plannedRange = calculatePlannedStockRange(actualCount, itemId, nextTrades);
+    nextGoods[index] = applyPlannedStockRange(item, plannedRange);
     await updateGoodsStock(userId, item.id, {
       count: actualCount,
-      planned_count: plannedCount,
+      planned_count: plannedRange.max,
     });
   }
 

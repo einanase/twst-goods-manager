@@ -22,7 +22,13 @@ import { ImageCropModal, type CroppedImageAsset } from '../components/ImageCropM
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { QuantityStepper } from '../components/QuantityStepper';
 import { TextField } from '../components/TextField';
-import { calculatePlannedStockCount } from '../lib/stockProjection';
+import {
+  applyCalculatedPlannedStockRange,
+  applyPlannedStockRange,
+  calculatePlannedStockRange,
+  formatPlannedStockCount,
+  getPlannedStockRangeFromItem,
+} from '../lib/stockProjection';
 import { colors } from '../lib/theme';
 import type { GoodsItem, RowId } from '../types/domain';
 import {
@@ -103,7 +109,8 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setItems(await loadGoods(userId));
+      const [nextItems, trades] = await Promise.all([loadGoods(userId), loadTrades(userId)]);
+      setItems(nextItems.map((item) => applyCalculatedPlannedStockRange(item, trades)));
     } catch (error) {
       showError('在庫の読み込みに失敗しました', error);
     } finally {
@@ -288,11 +295,15 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         });
       }
 
+      const plannedRange = editingItem
+        ? calculatePlannedStockRange(count, editingItem.id, await loadTrades(userId))
+        : { min: count, max: count };
+
       const input = {
         type: type.trim(),
         char: name.trim(),
         count,
-        planned_count: editingItem?.planned_count ?? count,
+        planned_count: plannedRange.max,
         image_url: nextImageValue,
         sort_order: editingItem?.sort_order ?? null,
       };
@@ -305,9 +316,10 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         await removeStoredImage(userId, editingItem.image_url);
       }
 
+      const savedWithPlannedRange = applyPlannedStockRange(saved, plannedRange);
       setItems((current) => {
-        if (!editingItem) return [saved, ...current];
-        return current.map((item) => (String(item.id) === String(saved.id) ? saved : item));
+        if (!editingItem) return [savedWithPlannedRange, ...current];
+        return current.map((item) => (String(item.id) === String(saved.id) ? savedWithPlannedRange : item));
       });
       setCameraVisible(false);
       setModalVisible(false);
@@ -321,28 +333,30 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
 
   async function changeCount(item: GoodsItem, nextCount: number) {
     const previous = items;
-    const pendingDiff = (item.planned_count ?? item.count ?? 0) - (item.count ?? 0);
-    const optimisticPlannedCount = Math.max(0, nextCount + pendingDiff);
+    const currentRange = getPlannedStockRangeFromItem(item);
+    const currentActual = item.count ?? 0;
+    const optimisticMin = Math.max(0, nextCount + currentRange.min - currentActual);
+    const optimisticMax = Math.max(optimisticMin, Math.max(0, nextCount + currentRange.max - currentActual));
 
     setItems((current) =>
       current.map((candidate) =>
         String(candidate.id) === String(item.id)
-          ? { ...candidate, count: nextCount, planned_count: optimisticPlannedCount }
+          ? applyPlannedStockRange({ ...candidate, count: nextCount }, { min: optimisticMin, max: optimisticMax })
           : candidate,
       ),
     );
 
     try {
       const trades = await loadTrades(userId);
-      const plannedCount = calculatePlannedStockCount(nextCount, item.id, trades);
+      const plannedRange = calculatePlannedStockRange(nextCount, item.id, trades);
       await updateGoodsStock(userId, item.id, {
         count: nextCount,
-        planned_count: plannedCount,
+        planned_count: plannedRange.max,
       });
       setItems((current) =>
         current.map((candidate) =>
           String(candidate.id) === String(item.id)
-            ? { ...candidate, count: nextCount, planned_count: plannedCount }
+            ? applyPlannedStockRange({ ...candidate, count: nextCount }, plannedRange)
             : candidate,
         ),
       );
@@ -457,7 +471,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
           numColumns={isGalleryView ? galleryColumnCount : 1}
           renderItem={({ item }) => {
             const actualCount = item.count ?? 0;
-            const plannedCount = item.planned_count ?? actualCount;
+            const plannedCountText = formatPlannedStockCount(item);
             const itemIndex = items.findIndex((candidate) => idsMatch(candidate.id, item.id));
             const canMoveUp = itemIndex > 0;
             const canMoveDown = itemIndex >= 0 && itemIndex < items.length - 1;
@@ -512,11 +526,15 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
                     <View style={styles.galleryCountSummary}>
                       <View style={styles.galleryCountBadge}>
                         <Text style={styles.countBadgeLabel}>予定数</Text>
-                        <Text style={styles.countBadgeValue}>{plannedCount}</Text>
+                        <Text style={styles.countBadgeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                          {plannedCountText}
+                        </Text>
                       </View>
                       <View style={styles.galleryCountBadge}>
                         <Text style={styles.countBadgeLabel}>実数</Text>
-                        <Text style={styles.countBadgeValue}>{actualCount}</Text>
+                        <Text style={styles.countBadgeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                          {actualCount}
+                        </Text>
                       </View>
                     </View>
                     <View style={styles.galleryStepperRow}>
@@ -566,11 +584,15 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
                   <View style={styles.countSummary}>
                     <View style={styles.countBadge}>
                       <Text style={styles.countBadgeLabel}>予定数</Text>
-                      <Text style={styles.countBadgeValue}>{plannedCount}</Text>
+                      <Text style={styles.countBadgeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                        {plannedCountText}
+                      </Text>
                     </View>
                     <View style={styles.countBadge}>
                       <Text style={styles.countBadgeLabel}>実数</Text>
-                      <Text style={styles.countBadgeValue}>{actualCount}</Text>
+                      <Text style={styles.countBadgeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                        {actualCount}
+                      </Text>
                     </View>
                   </View>
                   <View style={styles.countAdjustRow}>
@@ -615,7 +637,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
               <Text style={styles.stepperLabel}>実数</Text>
               {editingItem ? (
                 <Text style={styles.plannedHint}>
-                  予定数: {editingItem.planned_count ?? editingItem.count ?? 0}
+                  予定数: {formatPlannedStockCount(editingItem)}
                 </Text>
               ) : null}
               <QuantityStepper value={count} onChange={setCount} />
@@ -925,7 +947,7 @@ const styles = StyleSheet.create({
   countBadge: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: 8,
-    minWidth: 68,
+    minWidth: 78,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
@@ -936,7 +958,7 @@ const styles = StyleSheet.create({
   },
   countBadgeValue: {
     color: colors.text,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
     marginTop: 2,
   },

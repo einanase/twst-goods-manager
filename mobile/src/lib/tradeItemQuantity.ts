@@ -45,6 +45,17 @@ export function getFixedTradeItemCount(item: TradeItem) {
   return count > 0 ? count : null;
 }
 
+export function getTradeItemCountRange(item: TradeItem) {
+  if (isRangeTradeItem(item)) {
+    const min = sanitizeRangeCount(item.min_count ?? item.count);
+    const max = Math.max(min, sanitizeRangeCount(item.max_count ?? item.count));
+    return { min, max };
+  }
+
+  const count = getFixedTradeItemCount(item);
+  return count ? { min: count, max: count } : null;
+}
+
 export function formatTradeItemQuantity(item: TradeItem) {
   if (isRangeTradeItem(item)) {
     const min = sanitizeRangeCount(item.min_count ?? item.count);

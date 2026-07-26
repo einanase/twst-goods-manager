@@ -7,6 +7,8 @@ export type GoodsItem = {
   char: string;
   count: number;
   planned_count: number | null;
+  planned_min_count?: number | null;
+  planned_max_count?: number | null;
   image_url: string | null;
   image_display_url?: string;
   sort_order: number | null;
