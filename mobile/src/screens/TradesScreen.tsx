@@ -45,6 +45,10 @@ import type { GoodsItem, RowId, Trade, TradeInput, TradeItem, TradeStatus, Trade
 type TradesScreenProps = {
   userId: string;
   onTradesChanged?: () => void;
+  openTradeRequest?: {
+    tradeId: RowId;
+    requestKey: number;
+  } | null;
 };
 
 type ImagePreview = {
@@ -77,7 +81,7 @@ const tradeFormSteps: Array<{ key: TradeFormStep; label: string }> = [
   { key: 'notes', label: 'メモ' },
 ];
 
-export function TradesScreen({ userId, onTradesChanged }: TradesScreenProps) {
+export function TradesScreen({ userId, onTradesChanged, openTradeRequest }: TradesScreenProps) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [goods, setGoods] = useState<GoodsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +113,7 @@ export function TradesScreen({ userId, onTradesChanged }: TradesScreenProps) {
   const [calendarTarget, setCalendarTarget] = useState<CalendarTarget>(null);
   const [cameraVisible, setCameraVisible] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+  const [handledOpenRequestKey, setHandledOpenRequestKey] = useState<number | null>(null);
 
   function showNotice(title: string, message: string) {
     if (Platform.OS === 'web') {
@@ -144,6 +149,22 @@ export function TradesScreen({ userId, onTradesChanged }: TradesScreenProps) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!openTradeRequest || loading || handledOpenRequestKey === openTradeRequest.requestKey) return;
+
+    const targetTrade = trades.find((trade) => String(trade.id) === String(openTradeRequest.tradeId));
+    if (!targetTrade) {
+      if (trades.length) {
+        showNotice('取引が見つかりません', '選択した取引を読み込めませんでした。取引一覧を確認してください。');
+        setHandledOpenRequestKey(openTradeRequest.requestKey);
+      }
+      return;
+    }
+
+    openEdit(targetTrade);
+    setHandledOpenRequestKey(openTradeRequest.requestKey);
+  }, [handledOpenRequestKey, loading, openTradeRequest, trades]);
 
   const filteredTrades = useMemo(() => {
     const nameKeyword = search.trim().toLowerCase();

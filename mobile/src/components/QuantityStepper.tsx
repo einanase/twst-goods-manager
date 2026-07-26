@@ -48,7 +48,10 @@ export function QuantityStepper({ value, onChange, min = 0 }: QuantityStepperPro
     <View style={styles.wrap}>
       <Pressable
         accessibilityRole="button"
-        onPress={() => onChange(Math.max(min, value - 1))}
+        onPress={(event) => {
+          event.stopPropagation();
+          onChange(Math.max(min, value - 1));
+        }}
         style={styles.control}
       >
         <Text style={styles.controlText}>-</Text>
@@ -63,11 +66,19 @@ export function QuantityStepper({ value, onChange, min = 0 }: QuantityStepperPro
           setEditing(true);
           setDraftValue(String(value));
         }}
+        onPressIn={(event) => event.stopPropagation()}
         selectTextOnFocus
         style={styles.valueInput}
         value={editing ? draftValue : String(value)}
       />
-      <Pressable accessibilityRole="button" onPress={() => onChange(value + 1)} style={styles.control}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={(event) => {
+          event.stopPropagation();
+          onChange(value + 1);
+        }}
+        style={styles.control}
+      >
         <Text style={styles.controlText}>+</Text>
       </Pressable>
     </View>

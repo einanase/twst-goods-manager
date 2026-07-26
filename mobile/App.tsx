@@ -23,9 +23,13 @@ import { hasSupabaseConfig } from './src/lib/env';
 import { colors } from './src/lib/theme';
 import { appBrand } from './src/lib/brand';
 import { loadTrades } from './src/services/tradeService';
-import type { Trade } from './src/types/domain';
+import type { RowId, Trade } from './src/types/domain';
 
 type MainTab = 'inventory' | 'trades' | 'settings';
+type TradeOpenRequest = {
+  tradeId: RowId;
+  requestKey: number;
+};
 type DueNotificationKind = 'ship' | 'receive';
 type DueNotification = {
   key: string;
@@ -45,6 +49,7 @@ export default function App() {
   const [notifications, setNotifications] = useState<DueNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [selectedNotificationKey, setSelectedNotificationKey] = useState<string | null>(null);
+  const [tradeOpenRequest, setTradeOpenRequest] = useState<TradeOpenRequest | null>(null);
 
   useEffect(() => {
     if (!hasSupabaseConfig) {
@@ -99,10 +104,29 @@ export default function App() {
 
   const activeScreen = useMemo(() => {
     if (!userId) return null;
-    if (tab === 'inventory') return <InventoryScreen userId={userId} />;
+    if (tab === 'inventory') {
+      return (
+        <InventoryScreen
+          userId={userId}
+          onOpenTrade={(tradeId) => {
+            setTradeOpenRequest((current) => ({
+              tradeId,
+              requestKey: (current?.requestKey ?? 0) + 1,
+            }));
+            setTab('trades');
+          }}
+        />
+      );
+    }
     if (tab === 'settings') return <LegalScreen userId={userId} email={email} />;
-    return <TradesScreen userId={userId} onTradesChanged={refreshNotifications} />;
-  }, [refreshNotifications, tab, userId]);
+    return (
+      <TradesScreen
+        userId={userId}
+        onTradesChanged={refreshNotifications}
+        openTradeRequest={tradeOpenRequest}
+      />
+    );
+  }, [email, refreshNotifications, tab, tradeOpenRequest, userId]);
 
   const selectedNotification =
     notifications.find((notification) => notification.key === selectedNotificationKey) ?? null;

@@ -31,7 +31,8 @@ import {
   getStoredPlannedStockCount,
 } from '../lib/stockProjection';
 import { colors } from '../lib/theme';
-import type { GoodsItem, RowId } from '../types/domain';
+import { formatTradeItemQuantity } from '../lib/tradeItemQuantity';
+import type { GoodsItem, RowId, Trade, TradeItem, TradeStatus } from '../types/domain';
 import {
   createGoods,
   deleteGoods,
@@ -45,6 +46,7 @@ import { loadTrades } from '../services/tradeService';
 
 type InventoryScreenProps = {
   userId: string;
+  onOpenTrade?: (tradeId: RowId) => void;
 };
 
 type ImagePreview = {
@@ -64,10 +66,20 @@ type PendingCropImage = {
 } | null;
 
 type InventoryView = 'list' | 'gallery';
-const INVENTORY_VIEW_STORAGE_KEY = 'guttore.inventoryView';
+type PlannedTradeStatus = Extract<TradeStatus, '成約' | '仮約束'>;
+type PlannedTradeDirection = 'give' | 'receive';
+type PlannedTradeEntry = {
+  trade: Trade;
+  item: TradeItem;
+};
+type PlannedTradeGroups = Record<PlannedTradeDirection, Record<PlannedTradeStatus, PlannedTradeEntry[]>>;
 
-export function InventoryScreen({ userId }: InventoryScreenProps) {
+const INVENTORY_VIEW_STORAGE_KEY = 'guttore.inventoryView';
+const plannedTradeStatuses: PlannedTradeStatus[] = ['成約', '仮約束'];
+
+export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
   const [items, setItems] = useState<GoodsItem[]>([]);
+  const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -87,6 +99,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   const [cameraVisible, setCameraVisible] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [pendingCropImage, setPendingCropImage] = useState<PendingCropImage>(null);
+  const [plannedDetailItemId, setPlannedDetailItemId] = useState<RowId | null>(null);
   const { width } = useWindowDimensions();
 
   function showNotice(title: string, message: string) {
@@ -110,8 +123,9 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [nextItems, trades] = await Promise.all([loadGoods(userId), loadTrades(userId)]);
-      setItems(nextItems.map((item) => applyCalculatedPlannedStockRange(item, trades)));
+      const [nextItems, nextTrades] = await Promise.all([loadGoods(userId), loadTrades(userId)]);
+      setTrades(nextTrades);
+      setItems(nextItems.map((item) => applyCalculatedPlannedStockRange(item, nextTrades)));
     } catch (error) {
       showError('在庫の読み込みに失敗しました', error);
     } finally {
@@ -149,6 +163,11 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
       `${item.type} ${item.char}`.toLowerCase().includes(keyword),
     );
   }, [items, search]);
+
+  const plannedDetailItem = useMemo(() => {
+    if (plannedDetailItemId === null) return null;
+    return items.find((item) => idsMatch(item.id, plannedDetailItemId)) ?? null;
+  }, [items, plannedDetailItemId]);
 
   function openCreate() {
     setCameraVisible(false);
@@ -296,8 +315,10 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         });
       }
 
+      const latestTrades = editingItem ? await loadTrades(userId) : trades;
+      if (editingItem) setTrades(latestTrades);
       const plannedRange = editingItem
-        ? calculatePlannedStockRange(count, editingItem.id, await loadTrades(userId))
+        ? calculatePlannedStockRange(count, editingItem.id, latestTrades)
         : { min: count, max: count };
 
       const input = {
@@ -348,8 +369,9 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
     );
 
     try {
-      const trades = await loadTrades(userId);
-      const plannedRange = calculatePlannedStockRange(nextCount, item.id, trades);
+      const nextTrades = await loadTrades(userId);
+      setTrades(nextTrades);
+      const plannedRange = calculatePlannedStockRange(nextCount, item.id, nextTrades);
       await updateGoodsStock(userId, item.id, {
         count: nextCount,
         planned_count: getStoredPlannedStockCount(plannedRange),
@@ -410,6 +432,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
           try {
             await deleteGoods(userId, item.id);
             await removeStoredImage(userId, item.image_url);
+            if (idsMatch(plannedDetailItemId, item.id)) setPlannedDetailItemId(null);
             setItems((current) => current.filter((candidate) => String(candidate.id) !== String(item.id)));
           } catch (error) {
             showError('削除に失敗しました', error);
@@ -420,6 +443,11 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   }
 
   const currentEditImageUri = imageUri ?? (editingItem?.image_display_url && storedImageValue ? editingItem.image_display_url : null);
+
+  function openTradeFromPlannedDetail(tradeId: RowId) {
+    setPlannedDetailItemId(null);
+    onOpenTrade?.(tradeId);
+  }
 
   return (
     <View style={styles.screen}>
@@ -492,7 +520,10 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
                 />
               </View>
             ) : (
-              <AppButton label="削除" variant="danger" onPress={() => confirmDelete(item)} />
+              <View style={styles.itemActions}>
+                <AppButton label="編集" variant="secondary" onPress={() => openEdit(item)} />
+                <AppButton label="削除" variant="danger" onPress={() => confirmDelete(item)} />
+              </View>
             );
 
             if (isGalleryView) {
@@ -501,7 +532,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
                   style={[styles.galleryCard, reorderMode ? styles.reorderCard : null]}
                   onPress={() => {
                     if (reorderMode) return;
-                    openEdit(item);
+                    setPlannedDetailItemId(item.id);
                   }}
                 >
                   <Pressable
@@ -559,7 +590,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
                 style={[styles.card, reorderMode ? styles.reorderCard : null]}
                 onPress={() => {
                   if (reorderMode) return;
-                  openEdit(item);
+                  setPlannedDetailItemId(item.id);
                 }}
               >
                 {item.image_display_url ? (
@@ -706,6 +737,12 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         title={previewImage?.title}
         onClose={() => setPreviewImage(null)}
       />
+      <PlannedTradesModal
+        item={plannedDetailItem}
+        onClose={() => setPlannedDetailItemId(null)}
+        onOpenTrade={openTradeFromPlannedDetail}
+        trades={trades}
+      />
       <ImageCropModal
         source={pendingCropImage}
         visible={Boolean(pendingCropImage)}
@@ -763,6 +800,117 @@ function ConfirmDialog({
   );
 }
 
+function PlannedTradesModal({
+  item,
+  trades,
+  onClose,
+  onOpenTrade,
+}: {
+  item: GoodsItem | null;
+  trades: Trade[];
+  onClose: () => void;
+  onOpenTrade: (tradeId: RowId) => void;
+}) {
+  const groups = item ? buildPlannedTradeGroups(item.id, trades) : createEmptyPlannedTradeGroups();
+  const hasEntries = hasPlannedTradeEntries(groups);
+
+  return (
+    <Modal visible={Boolean(item)} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.detailModalRoot}>
+        <View style={styles.detailModalHeader}>
+          <View style={styles.detailTitleBlock}>
+            <Text style={styles.modalTitle}>予定の内訳</Text>
+            <Text style={styles.detailSubtitle}>
+              {item ? `${item.type} / ${item.char}` : ''}
+            </Text>
+          </View>
+          <AppButton label="閉じる" variant="ghost" onPress={onClose} />
+        </View>
+
+        {item ? (
+          <View style={styles.detailCountRow}>
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeLabel}>予定数</Text>
+              <Text style={styles.countBadgeValue}>{formatPlannedStockCount(item)}</Text>
+            </View>
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeLabel}>実数</Text>
+              <Text style={styles.countBadgeValue}>{item.count ?? 0}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        <ScrollView contentContainerStyle={styles.plannedDetailContent}>
+          {hasEntries ? (
+            <>
+              <PlannedDirectionSection
+                groups={groups.give}
+                onOpenTrade={onOpenTrade}
+                title="渡すもの"
+              />
+              <PlannedDirectionSection
+                groups={groups.receive}
+                onOpenTrade={onOpenTrade}
+                title="受けるもの"
+              />
+            </>
+          ) : (
+            <View style={styles.plannedEmptyBox}>
+              <Text style={styles.plannedEmptyTitle}>予定にかかっている取引はありません</Text>
+              <Text style={styles.plannedEmptyText}>
+                成約・仮約束のうち、未発送または未受取でこの在庫に関係する取引だけがここに出ます。
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+function PlannedDirectionSection({
+  title,
+  groups,
+  onOpenTrade,
+}: {
+  title: string;
+  groups: Record<PlannedTradeStatus, PlannedTradeEntry[]>;
+  onOpenTrade: (tradeId: RowId) => void;
+}) {
+  const hasEntries = plannedTradeStatuses.some((status) => groups[status].length > 0);
+  if (!hasEntries) return null;
+
+  return (
+    <View style={styles.plannedDirectionSection}>
+      <Text style={styles.plannedDirectionTitle}>{title}</Text>
+      {plannedTradeStatuses.map((status) => {
+        const entries = groups[status];
+        if (!entries.length) return null;
+
+        return (
+          <View key={`${title}-${status}`} style={styles.plannedStatusSection}>
+            <Text style={styles.plannedStatusTitle}>{status}</Text>
+            {entries.map((entry) => (
+              <Pressable
+                key={`${title}-${status}-${entry.trade.id}-${entry.item.id}-${entry.item.count}-${entry.item.min_count}-${entry.item.max_count}`}
+                accessibilityRole="button"
+                onPress={() => onOpenTrade(entry.trade.id)}
+                style={styles.plannedTradeRow}
+              >
+                <View style={styles.plannedTradeTextBlock}>
+                  <Text style={styles.plannedTradeName}>{entry.trade.name}</Text>
+                  <Text style={styles.plannedTradeQuantity}>{formatTradeItemQuantity(entry.item)}</Text>
+                </View>
+                <Text style={styles.plannedTradeOpenText}>開く</Text>
+              </Pressable>
+            ))}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function showError(title: string, error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   Alert.alert(title, message);
@@ -799,6 +947,50 @@ function moveGoodsItem(items: GoodsItem[], currentIndex: number, nextIndex: numb
   if (!movedItem) return items;
   reordered.splice(nextIndex, 0, movedItem);
   return reordered.map((item, index) => ({ ...item, sort_order: index }));
+}
+
+function createEmptyPlannedTradeGroups(): PlannedTradeGroups {
+  return {
+    give: {
+      成約: [],
+      仮約束: [],
+    },
+    receive: {
+      成約: [],
+      仮約束: [],
+    },
+  };
+}
+
+function buildPlannedTradeGroups(itemId: RowId, trades: Trade[]): PlannedTradeGroups {
+  const groups = createEmptyPlannedTradeGroups();
+  const targetId = String(itemId);
+
+  for (const trade of trades) {
+    if (!isPlannedTradeStatus(trade.status)) continue;
+
+    const giveItem = (trade.give_items ?? []).find((candidate) => String(candidate.id) === targetId);
+    if (giveItem && !trade.is_sent) {
+      groups.give[trade.status].push({ trade, item: giveItem });
+    }
+
+    const receiveItem = (trade.receive_items ?? []).find((candidate) => String(candidate.id) === targetId);
+    if (receiveItem && !trade.is_received) {
+      groups.receive[trade.status].push({ trade, item: receiveItem });
+    }
+  }
+
+  return groups;
+}
+
+function isPlannedTradeStatus(status: TradeStatus): status is PlannedTradeStatus {
+  return status === '成約' || status === '仮約束';
+}
+
+function hasPlannedTradeEntries(groups: PlannedTradeGroups) {
+  return plannedTradeStatuses.some(
+    (status) => groups.give[status].length > 0 || groups.receive[status].length > 0,
+  );
 }
 
 const styles = StyleSheet.create({
@@ -854,6 +1046,14 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     gap: 8,
     justifyContent: 'center',
+    minWidth: 72,
+  },
+  itemActions: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
     minWidth: 72,
   },
   galleryCard: {
@@ -1087,5 +1287,114 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'flex-end',
+  },
+  detailModalRoot: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
+  detailModalHeader: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  detailTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  detailSubtitle: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  detailCountRow: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 16,
+    paddingBottom: 0,
+  },
+  plannedDetailContent: {
+    gap: 16,
+    padding: 16,
+    paddingBottom: 36,
+  },
+  plannedDirectionSection: {
+    gap: 10,
+  },
+  plannedDirectionTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  plannedStatusSection: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  plannedStatusTitle: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  plannedTradeRow: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+    minHeight: 48,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  plannedTradeTextBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  plannedTradeName: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  plannedTradeQuantity: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  plannedTradeOpenText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  plannedEmptyBox: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 32,
+  },
+  plannedEmptyTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  plannedEmptyText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
   },
 });
