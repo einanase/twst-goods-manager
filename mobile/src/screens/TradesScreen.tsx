@@ -25,6 +25,7 @@ import {
   applyCalculatedPlannedStockRange,
   applyPlannedStockRange,
   calculatePlannedStockRange,
+  getStoredPlannedStockCount,
 } from '../lib/stockProjection';
 import { colors } from '../lib/theme';
 import {
@@ -1747,7 +1748,7 @@ async function syncStockAfterTradeChange(
     nextGoods[index] = applyPlannedStockRange(item, plannedRange);
     await updateGoodsStock(userId, item.id, {
       count: actualCount,
-      planned_count: plannedRange.max,
+      planned_count: getStoredPlannedStockCount(plannedRange),
     });
   }
 

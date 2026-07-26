@@ -18,15 +18,20 @@ function affectsPlannedStock(trade: Trade) {
   return trade.status === '成約' || trade.status === '仮約束';
 }
 
-function normalizeStockCount(value: number | null | undefined) {
-  return Math.max(0, Math.floor(Number(value ?? 0) || 0));
+function normalizeProjectedStockCount(value: number | null | undefined) {
+  return Math.trunc(Number(value ?? 0) || 0);
+}
+
+function normalizeActualStockCount(value: number | null | undefined) {
+  return Math.max(0, normalizeProjectedStockCount(value));
 }
 
 function normalizeStockRange(min: number, max: number): StockCountRange {
-  const nextMin = normalizeStockCount(min);
+  const nextMin = normalizeProjectedStockCount(min);
+  const nextMax = normalizeProjectedStockCount(max);
   return {
-    min: nextMin,
-    max: Math.max(nextMin, normalizeStockCount(max)),
+    min: Math.min(nextMin, nextMax),
+    max: Math.max(nextMin, nextMax),
   };
 }
 
@@ -61,7 +66,7 @@ export function calculatePendingStockDiff(itemId: RowId, trades: Trade[]) {
 }
 
 export function calculatePlannedStockRange(actualCount: number, itemId: RowId, trades: Trade[]) {
-  const actual = normalizeStockCount(actualCount);
+  const actual = normalizeActualStockCount(actualCount);
   const pendingDiff = calculatePendingStockDiffRange(itemId, trades);
   return normalizeStockRange(actual + pendingDiff.min, actual + pendingDiff.max);
 }
@@ -90,8 +95,12 @@ export function applyCalculatedPlannedStockRange<T extends PlannedStockItem>(ite
   return applyPlannedStockRange(item, calculateGoodsPlannedStockRange(item, trades));
 }
 
+export function getStoredPlannedStockCount(range: StockCountRange) {
+  return Math.max(0, normalizeProjectedStockCount(range.max));
+}
+
 export function getPlannedStockRangeFromItem(item: PlannedStockItem): StockCountRange {
-  const fallback = normalizeStockCount(item.planned_count ?? item.count);
+  const fallback = normalizeProjectedStockCount(item.planned_count ?? item.count);
   return normalizeStockRange(item.planned_min_count ?? fallback, item.planned_max_count ?? fallback);
 }
 

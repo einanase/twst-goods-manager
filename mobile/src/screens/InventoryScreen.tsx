@@ -28,6 +28,7 @@ import {
   calculatePlannedStockRange,
   formatPlannedStockCount,
   getPlannedStockRangeFromItem,
+  getStoredPlannedStockCount,
 } from '../lib/stockProjection';
 import { colors } from '../lib/theme';
 import type { GoodsItem, RowId } from '../types/domain';
@@ -303,7 +304,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         type: type.trim(),
         char: name.trim(),
         count,
-        planned_count: plannedRange.max,
+        planned_count: getStoredPlannedStockCount(plannedRange),
         image_url: nextImageValue,
         sort_order: editingItem?.sort_order ?? null,
       };
@@ -335,8 +336,8 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
     const previous = items;
     const currentRange = getPlannedStockRangeFromItem(item);
     const currentActual = item.count ?? 0;
-    const optimisticMin = Math.max(0, nextCount + currentRange.min - currentActual);
-    const optimisticMax = Math.max(optimisticMin, Math.max(0, nextCount + currentRange.max - currentActual));
+    const optimisticMin = nextCount + currentRange.min - currentActual;
+    const optimisticMax = Math.max(optimisticMin, nextCount + currentRange.max - currentActual);
 
     setItems((current) =>
       current.map((candidate) =>
@@ -351,7 +352,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
       const plannedRange = calculatePlannedStockRange(nextCount, item.id, trades);
       await updateGoodsStock(userId, item.id, {
         count: nextCount,
-        planned_count: plannedRange.max,
+        planned_count: getStoredPlannedStockCount(plannedRange),
       });
       setItems((current) =>
         current.map((candidate) =>
