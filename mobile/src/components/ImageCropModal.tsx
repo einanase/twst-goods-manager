@@ -26,6 +26,11 @@ type CropSource = {
   fileName?: string | null;
 };
 
+type ImageSize = {
+  width: number;
+  height: number;
+};
+
 export type CroppedImageAsset = {
   uri: string;
   fileName: string;
@@ -42,6 +47,7 @@ export function ImageCropModal({ source, visible, onCancel, onApply }: ImageCrop
   const [shape, setShape] = useState<CropShape>('square');
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [sourceSize, setSourceSize] = useState<ImageSize | null>(null);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState('');
 
@@ -50,22 +56,66 @@ export function ImageCropModal({ source, visible, onCancel, onApply }: ImageCrop
     setShape('square');
     setZoom(1);
     setOffset({ x: 0, y: 0 });
+    setSourceSize(null);
     setRendering(false);
     setError('');
   }, [visible, source?.uri]);
+
+  useEffect(() => {
+    if (!visible || !source?.uri) return;
+    let cancelled = false;
+    const sourceUri = source.uri;
+
+    async function loadSourceSize() {
+      try {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          const image = await loadImage(sourceUri);
+          if (!cancelled) {
+            setSourceSize({
+              width: image.naturalWidth || image.width,
+              height: image.naturalHeight || image.height,
+            });
+          }
+          return;
+        }
+
+        Image.getSize(
+          sourceUri,
+          (width, height) => {
+            if (!cancelled) setSourceSize({ width, height });
+          },
+          () => {
+            if (!cancelled) setSourceSize(null);
+          },
+        );
+      } catch {
+        if (!cancelled) setSourceSize(null);
+      }
+    }
+
+    loadSourceSize();
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, source?.uri]);
+
+  useEffect(() => {
+    setOffset((current) => clampCropOffset(current, sourceSize, zoom));
+  }, [sourceSize, zoom]);
 
   if (!visible || !source) return null;
   const activeSource = source;
 
   function nudge(dx: number, dy: number) {
-    setOffset((current) => ({
-      x: clamp(current.x + dx, -0.48, 0.48),
-      y: clamp(current.y + dy, -0.48, 0.48),
-    }));
+    setOffset((current) => clampCropOffset({ x: current.x + dx, y: current.y + dy }, sourceSize, zoom));
   }
 
   function changeZoom(delta: number) {
-    setZoom((current) => clamp(Number((current + delta).toFixed(2)), 1, 3));
+    setZoom((current) => {
+      const nextZoom = clamp(Number((current + delta).toFixed(2)), 1, 3);
+      setOffset((currentOffset) => clampCropOffset(currentOffset, sourceSize, nextZoom));
+      return nextZoom;
+    });
   }
 
   async function applyCrop() {
@@ -275,6 +325,30 @@ function buildCroppedFileName(fileName?: string | null) {
     .slice(0, 40) || 'goods-image';
 
   return `${baseName}-cropped.png`;
+}
+
+function clampCropOffset(offset: { x: number; y: number }, sourceSize: ImageSize | null, zoom: number) {
+  const limit = getOffsetLimit(sourceSize, zoom);
+  return {
+    x: clamp(offset.x, -limit.x, limit.x),
+    y: clamp(offset.y, -limit.y, limit.y),
+  };
+}
+
+function getOffsetLimit(sourceSize: ImageSize | null, zoom: number) {
+  if (!sourceSize?.width || !sourceSize.height) {
+    const fallbackLimit = Math.max(0, (zoom - 1) / 2);
+    return { x: fallbackLimit, y: fallbackLimit };
+  }
+
+  const sourceWidth = Math.max(1, sourceSize.width);
+  const sourceHeight = Math.max(1, sourceSize.height);
+  const cropSide = Math.max(1, Math.min(sourceWidth, sourceHeight) / zoom);
+
+  return {
+    x: Math.max(0, (sourceWidth - cropSide) / (2 * cropSide)),
+    y: Math.max(0, (sourceHeight - cropSide) / (2 * cropSide)),
+  };
 }
 
 function clamp(value: number, min: number, max: number) {
