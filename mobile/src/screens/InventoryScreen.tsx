@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { AppButton } from '../components/AppButton';
 import { CameraCaptureModal, type CapturedImageAsset } from '../components/CameraCaptureModal';
 import { EmptyState } from '../components/EmptyState';
+import { ImageCropModal, type CroppedImageAsset } from '../components/ImageCropModal';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { QuantityStepper } from '../components/QuantityStepper';
 import { TextField } from '../components/TextField';
@@ -42,6 +43,11 @@ type ConfirmDialogState = {
   actions: AlertButton[];
 } | null;
 
+type PendingCropImage = {
+  uri: string;
+  fileName: string | null;
+} | null;
+
 export function InventoryScreen({ userId }: InventoryScreenProps) {
   const [items, setItems] = useState<GoodsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +65,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [cameraVisible, setCameraVisible] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+  const [pendingCropImage, setPendingCropImage] = useState<PendingCropImage>(null);
 
   function showNotice(title: string, message: string) {
     if (Platform.OS === 'web') {
@@ -103,6 +110,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
 
   function openCreate() {
     setCameraVisible(false);
+    setPendingCropImage(null);
     setEditingItem(null);
     setType('');
     setName('');
@@ -115,6 +123,7 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
 
   function openEdit(item: GoodsItem) {
     setCameraVisible(false);
+    setPendingCropImage(null);
     setEditingItem(item);
     setType(item.type ?? '');
     setName(item.char ?? '');
@@ -176,14 +185,42 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
 
   function applyPickedImage(asset: Pick<ImagePicker.ImagePickerAsset, 'uri' | 'fileName'> | undefined) {
     if (!asset?.uri) return;
+    if (Platform.OS === 'web') {
+      setPendingCropImage({
+        uri: asset.uri,
+        fileName: asset.fileName ?? null,
+      });
+      return;
+    }
+
     setImageUri(asset.uri);
     setImageName(asset.fileName ?? null);
+  }
+
+  function applyCroppedImage(asset: CroppedImageAsset) {
+    setImageUri(asset.uri);
+    setImageName(asset.fileName);
+    setPendingCropImage(null);
+  }
+
+  function openCropEditor() {
+    if (!currentEditImageUri) return;
+    if (Platform.OS !== 'web') {
+      showNotice('PWA版で利用できます', '切り抜き編集はWeb/PWA版で利用できます。');
+      return;
+    }
+
+    setPendingCropImage({
+      uri: currentEditImageUri,
+      fileName: imageName ?? 'goods-image.png',
+    });
   }
 
   function clearImage() {
     setImageUri(null);
     setImageName(null);
     setStoredImageValue(null);
+    setPendingCropImage(null);
   }
 
   function confirmRemoveImage() {
@@ -426,6 +463,12 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
                 <AppButton label="画像を選ぶ" variant="secondary" disabled={saving} onPress={pickImage} />
                 <AppButton label="撮影する" variant="secondary" disabled={saving} onPress={takePhoto} />
                 <AppButton
+                  label="切り抜き編集"
+                  variant="secondary"
+                  disabled={saving || !currentEditImageUri}
+                  onPress={openCropEditor}
+                />
+                <AppButton
                   label="画像を削除"
                   variant="ghost"
                   disabled={saving || !currentEditImageUri}
@@ -457,6 +500,12 @@ export function InventoryScreen({ userId }: InventoryScreenProps) {
         uri={previewImage?.uri ?? null}
         title={previewImage?.title}
         onClose={() => setPreviewImage(null)}
+      />
+      <ImageCropModal
+        source={pendingCropImage}
+        visible={Boolean(pendingCropImage)}
+        onCancel={() => setPendingCropImage(null)}
+        onApply={applyCroppedImage}
       />
       <ConfirmDialog dialog={confirmDialog} onClose={() => setConfirmDialog(null)} />
     </View>
