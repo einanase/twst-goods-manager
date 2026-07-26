@@ -1414,12 +1414,12 @@ function TradeItemEditor({
     }
 
     return (
-      <>
+      <View style={styles.fixedQuantityControls}>
         <QuantityStepper value={fixedQuantity} onChange={(next) => setFixedQuantity(id, next)} />
         {allowRange ? (
           <AppButton label="範囲を指定" variant="secondary" onPress={() => enableRange(id)} />
         ) : null}
-      </>
+      </View>
     );
   }
 
@@ -2250,7 +2250,9 @@ const styles = StyleSheet.create({
   },
   goodsPickControls: {
     alignItems: 'flex-end',
+    flexShrink: 1,
     gap: 8,
+    maxWidth: '100%',
   },
   selectedQuantityText: {
     color: colors.muted,
@@ -2326,14 +2328,24 @@ const styles = StyleSheet.create({
   },
   itemPickerActions: {
     alignItems: 'flex-end',
+    flexShrink: 1,
     gap: 8,
     marginLeft: 'auto',
+    maxWidth: '100%',
+  },
+  fixedQuantityControls: {
+    alignItems: 'flex-end',
+    flexShrink: 1,
+    gap: 8,
+    maxWidth: '100%',
   },
   rangeControlBox: {
     alignItems: 'stretch',
     backgroundColor: colors.surfaceMuted,
     borderRadius: 8,
+    flexShrink: 1,
     gap: 8,
+    maxWidth: '100%',
     padding: 10,
   },
   rangeStepperRow: {

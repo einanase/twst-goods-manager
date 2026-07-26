@@ -89,7 +89,9 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexShrink: 1,
     gap: 8,
+    maxWidth: '100%',
   },
   control: {
     alignItems: 'center',
@@ -114,8 +116,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     height: 36,
+    maxWidth: 96,
     minWidth: 52,
     paddingHorizontal: 8,
     textAlign: 'center',
+    width: 88,
   },
 });
