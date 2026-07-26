@@ -1295,29 +1295,43 @@ function TradeItemEditor({
   allowRange: boolean;
   onChange: (items: TradeItem[]) => void;
 }) {
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
+
   function itemFor(id: RowId) {
     return items.find((item) => String(item.id) === String(id));
   }
 
+  function updateItem(id: RowId, nextItem: TradeItem | null) {
+    const currentIndex = items.findIndex((item) => String(item.id) === String(id));
+    if (!nextItem) {
+      onChange(items.filter((item) => String(item.id) !== String(id)));
+      return;
+    }
+
+    if (currentIndex < 0) {
+      onChange([...items, nextItem]);
+      return;
+    }
+
+    onChange(items.map((item, index) => (index === currentIndex ? nextItem : item)));
+  }
+
   function setFixedQuantity(id: RowId, count: number) {
-    const next = items.filter((item) => String(item.id) !== String(id));
     const nextCount = sanitizeFixedCount(count);
-    if (nextCount > 0) next.push({ id, count: nextCount });
-    onChange(next);
+    updateItem(id, nextCount > 0 ? { id, count: nextCount } : null);
   }
 
   function setRangeQuantity(id: RowId, min: number, max: number) {
-    const next = items.filter((item) => String(item.id) !== String(id));
     const minCount = sanitizeRangeCount(min);
     const maxCount = Math.max(minCount, sanitizeRangeCount(max));
-    next.push({
+    updateItem(id, {
       id,
       count: maxCount,
       quantity_mode: 'range',
       min_count: minCount,
       max_count: maxCount,
     });
-    onChange(next);
   }
 
   function enableRange(id: RowId) {
@@ -1332,64 +1346,152 @@ function TradeItemEditor({
     setFixedQuantity(id, count);
   }
 
+  function addItem(id: RowId) {
+    if (itemFor(id)) return;
+    setFixedQuantity(id, 1);
+  }
+
+  function removeItem(id: RowId) {
+    updateItem(id, null);
+  }
+
+  function renderQuantityControls(id: RowId, item: TradeItem) {
+    const ranged = isRangeTradeItem(item);
+    const fixedQuantity = ranged ? sanitizeFixedCount(item.max_count ?? item.count) : sanitizeFixedCount(item.count);
+    const minQuantity = ranged ? sanitizeRangeCount(item.min_count ?? item.count) : 1;
+    const maxQuantity = ranged
+      ? Math.max(minQuantity, sanitizeRangeCount(item.max_count ?? item.count))
+      : Math.max(1, fixedQuantity);
+
+    if (ranged) {
+      return (
+        <View style={styles.rangeControlBox}>
+          <View style={styles.rangeStepperRow}>
+            <Text style={styles.rangeStepperLabel}>最小</Text>
+            <QuantityStepper
+              value={minQuantity}
+              min={1}
+              onChange={(next) => setRangeQuantity(id, next, Math.max(next, maxQuantity))}
+            />
+          </View>
+          <View style={styles.rangeStepperRow}>
+            <Text style={styles.rangeStepperLabel}>最大</Text>
+            <QuantityStepper
+              value={maxQuantity}
+              min={minQuantity}
+              onChange={(next) => setRangeQuantity(id, minQuantity, next)}
+            />
+          </View>
+          <AppButton label="固定数に戻す" variant="ghost" onPress={() => disableRange(id)} />
+        </View>
+      );
+    }
+
+    return (
+      <>
+        <QuantityStepper value={fixedQuantity} onChange={(next) => setFixedQuantity(id, next)} />
+        {allowRange ? (
+          <AppButton label="範囲を指定" variant="secondary" onPress={() => enableRange(id)} />
+        ) : null}
+      </>
+    );
+  }
+
+  const selectedEntries = items.map((item) => ({
+    item,
+    good: goods.find((candidate) => String(candidate.id) === String(item.id)),
+  }));
+  const keyword = pickerSearch.trim().toLowerCase();
+  const filteredGoods = keyword
+    ? goods.filter((good) => `${good.type} ${good.char}`.toLowerCase().includes(keyword))
+    : goods;
+
   return (
     <View style={styles.tradeItemEditor}>
-      <Text style={styles.sectionLabel}>{title}</Text>
+      <View style={styles.tradeItemEditorHeader}>
+        <Text style={styles.sectionLabel}>{title}</Text>
+        <AppButton
+          label="選ぶ"
+          variant="secondary"
+          disabled={!goods.length}
+          onPress={() => setPickerVisible(true)}
+        />
+      </View>
       {!allowRange ? (
         <Text style={styles.rangeHint}>成約・取引完了では数量を固定してください。</Text>
       ) : null}
-      {goods.length ? (
-        goods.map((good) => {
-          const item = itemFor(good.id);
-          const ranged = item ? isRangeTradeItem(item) : false;
-          const fixedQuantity = ranged ? sanitizeFixedCount(item?.max_count ?? item?.count) : sanitizeFixedCount(item?.count);
-          const minQuantity = item && ranged ? sanitizeRangeCount(item.min_count ?? item.count) : 1;
-          const maxQuantity = item && ranged
-            ? Math.max(minQuantity, sanitizeRangeCount(item.max_count ?? item.count))
-            : Math.max(1, fixedQuantity);
-
-          return (
-            <View key={`${title}-${good.id}`} style={styles.goodsPickRow}>
-              <View style={styles.goodsPickTextBlock}>
-                <Text style={styles.goodsPickType}>{good.type}</Text>
-                <Text style={styles.goodsPickName}>{good.char}</Text>
-              </View>
-              <View style={styles.goodsPickControls}>
-                {ranged ? (
-                  <View style={styles.rangeControlBox}>
-                    <View style={styles.rangeStepperRow}>
-                      <Text style={styles.rangeStepperLabel}>最小</Text>
-                      <QuantityStepper
-                        value={minQuantity}
-                        min={1}
-                        onChange={(next) => setRangeQuantity(good.id, next, Math.max(next, maxQuantity))}
-                      />
-                    </View>
-                    <View style={styles.rangeStepperRow}>
-                      <Text style={styles.rangeStepperLabel}>最大</Text>
-                      <QuantityStepper
-                        value={maxQuantity}
-                        min={minQuantity}
-                        onChange={(next) => setRangeQuantity(good.id, minQuantity, next)}
-                      />
-                    </View>
-                    <AppButton label="固定数に戻す" variant="ghost" onPress={() => disableRange(good.id)} />
-                  </View>
-                ) : (
-                  <>
-                    <QuantityStepper value={fixedQuantity} onChange={(next) => setFixedQuantity(good.id, next)} />
-                    {allowRange ? (
-                      <AppButton label="範囲を指定" variant="secondary" onPress={() => enableRange(good.id)} />
-                    ) : null}
-                  </>
-                )}
-              </View>
+      {selectedEntries.length ? (
+        selectedEntries.map(({ item, good }) => (
+          <View key={`${title}-${item.id}`} style={styles.goodsPickRow}>
+            <View style={styles.goodsPickTextBlock}>
+              <Text style={styles.goodsPickType}>{good?.type ?? '在庫'}</Text>
+              <Text style={styles.goodsPickName}>{good ? good.char : `ID:${item.id}`}</Text>
+              <Text style={styles.selectedQuantityText}>{formatTradeItemQuantity(item)}</Text>
             </View>
-          );
-        })
+            <View style={styles.goodsPickControls}>
+              {renderQuantityControls(item.id, item)}
+              <AppButton label="外す" variant="ghost" onPress={() => removeItem(item.id)} />
+            </View>
+          </View>
+        ))
       ) : (
-        <Text style={styles.tradeItemsTextMuted}>先に在庫を追加してください。</Text>
+        <Text style={styles.tradeItemsTextMuted}>
+          {goods.length ? 'まだ選択されていません。' : '先に在庫を追加してください。'}
+        </Text>
       )}
+      <Modal visible={pickerVisible} transparent animationType="fade" onRequestClose={() => setPickerVisible(false)}>
+        <View style={styles.itemPickerOverlay}>
+          <View style={styles.itemPickerPanel}>
+            <View style={styles.itemPickerHeader}>
+              <Text style={styles.itemPickerTitle}>{title}を選択</Text>
+              <AppButton label="閉じる" variant="ghost" onPress={() => setPickerVisible(false)} />
+            </View>
+            <TextField
+              label="検索"
+              value={pickerSearch}
+              onChangeText={setPickerSearch}
+              placeholder="種類・品名で検索"
+            />
+            <ScrollView style={styles.itemPickerList} contentContainerStyle={styles.itemPickerListContent}>
+              {filteredGoods.length ? (
+                filteredGoods.map((good) => {
+                  const selected = Boolean(itemFor(good.id));
+                  return (
+                    <View key={`${title}-picker-${good.id}`} style={styles.itemPickerRow}>
+                      {good.image_display_url ? (
+                        <Image source={{ uri: good.image_display_url }} style={styles.itemPickerImage} />
+                      ) : (
+                        <View style={styles.itemPickerImagePlaceholder}>
+                          <Text style={styles.placeholderText}>No Image</Text>
+                        </View>
+                      )}
+                      <View style={styles.itemPickerTextBlock}>
+                        <Text style={styles.goodsPickType}>{good.type}</Text>
+                        <Text style={styles.goodsPickName}>{good.char}</Text>
+                        {selected ? (
+                          <Text style={styles.selectedQuantityText}>
+                            {formatTradeItemQuantity(itemFor(good.id) as TradeItem)}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <AppButton
+                        label={selected ? '外す' : '追加'}
+                        variant={selected ? 'ghost' : 'secondary'}
+                        onPress={() => {
+                          if (selected) removeItem(good.id);
+                          else addItem(good.id);
+                        }}
+                      />
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={styles.tradeItemsTextMuted}>該当する在庫がありません。</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -2086,6 +2188,13 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 12,
   },
+  tradeItemEditorHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
   goodsPickRow: {
     alignItems: 'center',
     borderTopColor: colors.border,
@@ -2114,6 +2223,77 @@ const styles = StyleSheet.create({
   goodsPickControls: {
     alignItems: 'flex-end',
     gap: 8,
+  },
+  selectedQuantityText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  itemPickerOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 16,
+  },
+  itemPickerPanel: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    maxHeight: '88%',
+    maxWidth: 620,
+    padding: 16,
+    width: '100%',
+  },
+  itemPickerHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  itemPickerTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  itemPickerList: {
+    maxHeight: 520,
+  },
+  itemPickerListContent: {
+    gap: 8,
+    paddingBottom: 4,
+  },
+  itemPickerRow: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 10,
+  },
+  itemPickerImage: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 8,
+    height: 52,
+    width: 52,
+  },
+  itemPickerImagePlaceholder: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 8,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  itemPickerTextBlock: {
+    flex: 1,
+    minWidth: 0,
   },
   rangeControlBox: {
     alignItems: 'stretch',
