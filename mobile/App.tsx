@@ -175,45 +175,41 @@ export default function App() {
           </View>
         </View>
         <View style={styles.headerActions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="通知"
+            onPress={openNotifications}
+            style={({ pressed }) => [styles.notificationIconButton, pressed ? styles.pressed : null]}
+          >
+            <BellIcon />
+            {notifications.length ? (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {notifications.length > 9 ? '9+' : notifications.length}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
           <AppButton
             label="設定"
             variant={tab === 'settings' ? 'secondary' : 'ghost'}
+            size="compact"
             onPress={() => setTab('settings')}
           />
-          <AppButton label="ログアウト" variant="ghost" onPress={signOut} />
+          <AppButton label="ログアウト" variant="ghost" size="compact" onPress={signOut} />
         </View>
       </View>
 
-      <View style={styles.tabs}>
-        <AppButton
+      {activeScreen}
+
+      <View style={styles.bottomTabs}>
+        <BottomTabButton
+          active={tab === 'inventory'}
           label="在庫"
-          variant={tab === 'inventory' ? 'primary' : 'secondary'}
           onPress={() => setTab('inventory')}
         />
-        <AppButton
-          label="取引"
-          variant={tab === 'trades' ? 'primary' : 'secondary'}
-          onPress={() => setTab('trades')}
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="通知"
-          onPress={openNotifications}
-          style={({ pressed }) => [styles.notificationTabButton, pressed ? styles.pressed : null]}
-        >
-          <BellIcon />
-          <Text style={styles.notificationTabText}>通知</Text>
-          {notifications.length ? (
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>
-                {notifications.length > 9 ? '9+' : notifications.length}
-              </Text>
-            </View>
-          ) : null}
-        </Pressable>
+        <BottomTabButton active={tab === 'trades'} label="取引" onPress={() => setTab('trades')} />
       </View>
-
-      {activeScreen}
       <NotificationCenter
         loading={notificationsLoading}
         notifications={notifications}
@@ -242,6 +238,33 @@ function BellIcon() {
       <View style={styles.bellBase} />
       <View style={styles.bellClapper} />
     </View>
+  );
+}
+
+function BottomTabButton({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.bottomTabButton,
+        active ? styles.bottomTabButtonActive : null,
+        pressed ? styles.pressed : null,
+      ]}
+    >
+      <Text style={[styles.bottomTabText, active ? styles.bottomTabTextActive : null]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -439,13 +462,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
   },
   headerActions: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   headerIdentity: {
     alignItems: 'center',
@@ -455,8 +478,8 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   headerIcon: {
-    height: 44,
-    width: 44,
+    height: 40,
+    width: 40,
   },
   headerTextBlock: {
     flex: 1,
@@ -477,29 +500,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  tabs: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  notificationTabButton: {
+  notificationIconButton: {
     alignItems: 'center',
     backgroundColor: colors.secondary,
     borderColor: colors.secondary,
     borderRadius: 8,
     borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    position: 'relative',
+    width: 38,
+  },
+  bottomTabs: {
+    backgroundColor: colors.surface,
+    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: 8,
-    height: 42,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-    position: 'relative',
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
-  notificationTabText: {
+  bottomTabButton: {
+    alignItems: 'center',
+    backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  bottomTabButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  bottomTabText: {
     color: colors.secondaryText,
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  bottomTabTextActive: {
+    color: colors.primaryText,
   },
   bellIcon: {
     alignItems: 'center',

@@ -102,6 +102,9 @@ export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [pendingCropImage, setPendingCropImage] = useState<PendingCropImage>(null);
   const [plannedDetailItemId, setPlannedDetailItemId] = useState<RowId | null>(null);
+  const [countAdjustItem, setCountAdjustItem] = useState<GoodsItem | null>(null);
+  const [countAdjustDraft, setCountAdjustDraft] = useState('');
+  const [countAdjustSaving, setCountAdjustSaving] = useState(false);
   const { width } = useWindowDimensions();
 
   function showNotice(title: string, message: string) {
@@ -385,9 +388,11 @@ export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
             : candidate,
         ),
       );
+      return true;
     } catch (error) {
       setItems(previous);
       showError('在庫数の更新に失敗しました', error);
+      return false;
     }
   }
 
@@ -459,6 +464,37 @@ export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
     }
 
     setSearchVisible(true);
+  }
+
+  function openCountAdjust(item: GoodsItem) {
+    setCountAdjustItem(item);
+    setCountAdjustDraft(String(item.count ?? 0));
+  }
+
+  function closeCountAdjust() {
+    if (countAdjustSaving) return;
+    setCountAdjustItem(null);
+    setCountAdjustDraft('');
+  }
+
+  async function saveCountAdjust() {
+    if (!countAdjustItem) return;
+
+    const nextCount = parseCountInput(countAdjustDraft);
+    if (nextCount === null) {
+      showNotice('実数を入力してください', '0以上の数字で入力してください。');
+      return;
+    }
+
+    const latestItem =
+      items.find((candidate) => idsMatch(candidate.id, countAdjustItem.id)) ?? countAdjustItem;
+    setCountAdjustSaving(true);
+    const saved = await changeCount(latestItem, nextCount);
+    setCountAdjustSaving(false);
+    if (saved) {
+      setCountAdjustItem(null);
+      setCountAdjustDraft('');
+    }
   }
 
   return (
@@ -589,21 +625,10 @@ export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
                           {plannedCountText}
                         </Text>
                       </View>
-                      <View style={styles.galleryCountBadge}>
-                        <Text style={styles.countBadgeLabel}>実数</Text>
-                        <Text style={styles.countBadgeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                          {actualCount}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.galleryStepperRow}>
-                      <Text style={styles.countLabel}>実数</Text>
-                      <QuantityStepper
-                        value={actualCount}
-                        onChange={(next) => {
-                          if (reorderMode) return;
-                          changeCount(item, next);
-                        }}
+                      <ActualCountBadge
+                        count={actualCount}
+                        disabled={reorderMode || reorderSaving}
+                        onAdjust={() => openCountAdjust(item)}
                       />
                     </View>
                   </View>
@@ -653,20 +678,10 @@ export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
                           {plannedCountText}
                         </Text>
                       </View>
-                      <View style={styles.countBadge}>
-                        <Text style={styles.countBadgeLabel}>実数</Text>
-                        <Text style={styles.countBadgeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                          {actualCount}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.cardStepperWrap}>
-                      <QuantityStepper
-                        value={actualCount}
-                        onChange={(next) => {
-                          if (reorderMode) return;
-                          changeCount(item, next);
-                        }}
+                      <ActualCountBadge
+                        count={actualCount}
+                        disabled={reorderMode || reorderSaving}
+                        onAdjust={() => openCountAdjust(item)}
                       />
                     </View>
                   </View>
@@ -781,8 +796,93 @@ export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
         onCancel={() => setPendingCropImage(null)}
         onApply={applyCroppedImage}
       />
+      <CountAdjustModal
+        item={countAdjustItem}
+        saving={countAdjustSaving}
+        value={countAdjustDraft}
+        onChangeValue={(value) => setCountAdjustDraft(normalizeCountInput(value))}
+        onClose={closeCountAdjust}
+        onSave={saveCountAdjust}
+      />
       <ConfirmDialog dialog={confirmDialog} onClose={() => setConfirmDialog(null)} />
     </View>
+  );
+}
+
+function ActualCountBadge({
+  count,
+  disabled,
+  onAdjust,
+}: {
+  count: number;
+  disabled: boolean;
+  onAdjust: () => void;
+}) {
+  return (
+    <View style={styles.countBadge}>
+      <View style={styles.countBadgeHeader}>
+        <Text style={styles.countBadgeLabel}>実数</Text>
+        <AppButton
+          label="調整"
+          variant="secondary"
+          disabled={disabled}
+          size="compact"
+          onPress={onAdjust}
+        />
+      </View>
+      <Text style={styles.countBadgeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {count}
+      </Text>
+    </View>
+  );
+}
+
+function CountAdjustModal({
+  item,
+  saving,
+  value,
+  onChangeValue,
+  onClose,
+  onSave,
+}: {
+  item: GoodsItem | null;
+  saving: boolean;
+  value: string;
+  onChangeValue: (value: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <Modal visible={Boolean(item)} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.confirmOverlay}>
+        <View style={styles.countAdjustPanel}>
+          <View style={styles.countAdjustHeader}>
+            <View style={styles.countAdjustTitleBlock}>
+              <Text style={styles.confirmTitle}>実数を調整</Text>
+              <Text style={styles.countAdjustSubtitle} numberOfLines={2}>
+                {item ? `${item.type} / ${item.char}` : ''}
+              </Text>
+            </View>
+            <AppButton label="閉じる" variant="ghost" disabled={saving} size="compact" onPress={onClose} />
+          </View>
+          <TextField
+            autoFocus
+            inputMode="numeric"
+            keyboardType="number-pad"
+            label="実数"
+            onChangeText={onChangeValue}
+            onSubmitEditing={onSave}
+            placeholder="例：80"
+            selectTextOnFocus
+            value={value}
+          />
+          <View style={styles.countAdjustActions}>
+            <AppButton label="キャンセル" variant="ghost" disabled={saving} onPress={onClose} />
+            <AppButton label={saving ? '保存中...' : '反映する'} disabled={saving} onPress={onSave} />
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -964,6 +1064,18 @@ function getInitialInventoryView(): InventoryView {
   }
 }
 
+function normalizeCountInput(input: string) {
+  return input
+    .replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
+    .replace(/[^\d]/g, '');
+}
+
+function parseCountInput(input: string) {
+  const normalized = normalizeCountInput(input);
+  if (!normalized) return null;
+  return Math.max(0, Math.trunc(Number(normalized) || 0));
+}
+
 function idsMatch(left: RowId | string | null | undefined, right: RowId | string | null | undefined) {
   if (left === null || left === undefined || right === null || right === undefined) return false;
   return String(left) === String(right);
@@ -1131,13 +1243,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 8,
   },
-  galleryStepperRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'space-between',
-  },
   galleryActions: {
     paddingBottom: 12,
     paddingHorizontal: 12,
@@ -1209,9 +1314,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
     borderRadius: 8,
     flex: 1,
+    gap: 2,
     minWidth: 0,
     paddingHorizontal: 8,
     paddingVertical: 6,
+  },
+  countBadgeHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'space-between',
+    minHeight: 36,
   },
   countBadgeLabel: {
     color: colors.muted,
@@ -1223,20 +1336,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     marginTop: 2,
-  },
-  cardStepperWrap: {
-    flexShrink: 0,
-  },
-  countAdjustRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  countLabel: {
-    color: colors.muted,
-    fontSize: 13,
-    fontWeight: '800',
   },
   confirmOverlay: {
     alignItems: 'center',
@@ -1273,6 +1372,39 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   confirmActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
+  countAdjustPanel: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 14,
+    maxWidth: 420,
+    padding: 16,
+    width: '100%',
+  },
+  countAdjustHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  countAdjustTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  countAdjustSubtitle: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+    marginTop: 2,
+  },
+  countAdjustActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
