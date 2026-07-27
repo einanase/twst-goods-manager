@@ -84,6 +84,7 @@ export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [searchVisible, setSearchVisible] = useState(false);
   const [inventoryView, setInventoryView] = useState<InventoryView>(getInitialInventoryView);
   const [reorderMode, setReorderMode] = useState(false);
   const [reorderSaving, setReorderSaving] = useState(false);
@@ -450,28 +451,40 @@ export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
     onOpenTrade?.(tradeId);
   }
 
+  function toggleSearchVisible() {
+    if (searchVisible) {
+      setSearch('');
+      setSearchVisible(false);
+      return;
+    }
+
+    setSearchVisible(true);
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.toolbar}>
-        <TextField
-          label="検索"
-          value={search}
-          onChangeText={setSearch}
-          placeholder="種類・品名で検索"
-          style={styles.searchInput}
-        />
         <View style={styles.toolbarActions}>
+          <AppButton
+            label={searchVisible ? '閉じる' : '検索'}
+            variant={searchVisible || hasSearch ? 'secondary' : 'ghost'}
+            disabled={reorderSaving}
+            size="compact"
+            onPress={toggleSearchVisible}
+          />
           <View style={styles.viewToggle}>
             <AppButton
               label="一覧"
               variant={inventoryView === 'list' ? 'secondary' : 'ghost'}
               disabled={reorderSaving}
+              size="compact"
               onPress={() => setInventoryView('list')}
             />
             <AppButton
               label="画像"
               variant={inventoryView === 'gallery' ? 'secondary' : 'ghost'}
               disabled={reorderSaving}
+              size="compact"
               onPress={() => setInventoryView('gallery')}
             />
           </View>
@@ -479,10 +492,21 @@ export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
             label={reorderSaving ? '保存中...' : reorderMode ? '完了' : '並び替え'}
             variant="secondary"
             disabled={loading || saving || reorderSaving || hasSearch || items.length < 2}
+            size="compact"
             onPress={toggleReorderMode}
           />
-          <AppButton label="追加" onPress={openCreate} />
+          <AppButton label="追加" size="compact" onPress={openCreate} />
         </View>
+        {searchVisible ? (
+          <TextField
+            label="検索"
+            value={search}
+            onChangeText={setSearch}
+            placeholder="種類・品名で検索"
+            style={styles.searchInput}
+            autoFocus
+          />
+        ) : null}
       </View>
 
       {loading ? (
@@ -511,19 +535,21 @@ export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
                   label="上へ"
                   variant="secondary"
                   disabled={!canMoveUp || reorderSaving}
+                  size="compact"
                   onPress={() => moveItem(item, -1)}
                 />
                 <AppButton
                   label="下へ"
                   variant="secondary"
                   disabled={!canMoveDown || reorderSaving}
+                  size="compact"
                   onPress={() => moveItem(item, 1)}
                 />
               </View>
             ) : (
               <View style={styles.itemActions}>
-                <AppButton label="編集" variant="secondary" onPress={() => openEdit(item)} />
-                <AppButton label="削除" variant="danger" onPress={() => confirmDelete(item)} />
+                <AppButton label="編集" variant="secondary" size="compact" onPress={() => openEdit(item)} />
+                <AppButton label="削除" variant="danger" size="compact" onPress={() => confirmDelete(item)} />
               </View>
             );
 
@@ -612,34 +638,39 @@ export function InventoryScreen({ userId, onOpenTrade }: InventoryScreenProps) {
                   </View>
                 )}
                 <View style={styles.cardBody}>
-                  <Text style={styles.itemType}>{item.type}</Text>
-                  <Text style={styles.itemName}>{item.char}</Text>
-                  <View style={styles.countSummary}>
-                    <View style={styles.countBadge}>
-                      <Text style={styles.countBadgeLabel}>予定数</Text>
-                      <Text style={styles.countBadgeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                        {plannedCountText}
-                      </Text>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={styles.cardTitleBlock}>
+                      <Text style={styles.itemType} numberOfLines={1}>{item.type}</Text>
+                      <Text style={styles.itemName} numberOfLines={1}>{item.char}</Text>
                     </View>
-                    <View style={styles.countBadge}>
-                      <Text style={styles.countBadgeLabel}>実数</Text>
-                      <Text style={styles.countBadgeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                        {actualCount}
-                      </Text>
-                    </View>
+                    {actionControls}
                   </View>
-                  <View style={styles.countAdjustRow}>
-                    <Text style={styles.countLabel}>実数を調整</Text>
-                    <QuantityStepper
-                      value={actualCount}
-                      onChange={(next) => {
-                        if (reorderMode) return;
-                        changeCount(item, next);
-                      }}
-                    />
+                  <View style={styles.stockControlsRow}>
+                    <View style={styles.countSummary}>
+                      <View style={styles.countBadge}>
+                        <Text style={styles.countBadgeLabel}>予定数</Text>
+                        <Text style={styles.countBadgeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                          {plannedCountText}
+                        </Text>
+                      </View>
+                      <View style={styles.countBadge}>
+                        <Text style={styles.countBadgeLabel}>実数</Text>
+                        <Text style={styles.countBadgeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                          {actualCount}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.cardStepperWrap}>
+                      <QuantityStepper
+                        value={actualCount}
+                        onChange={(next) => {
+                          if (reorderMode) return;
+                          changeCount(item, next);
+                        }}
+                      />
+                    </View>
                   </View>
                 </View>
-                {actionControls}
               </Pressable>
             );
           }}
@@ -1005,13 +1036,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   toolbar: {
-    gap: 10,
-    padding: 16,
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   toolbarActions: {
+    alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
     justifyContent: 'flex-end',
   },
   viewToggle: {
@@ -1020,13 +1053,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   searchInput: {
-    minHeight: 44,
+    minHeight: 42,
   },
   loader: {
     marginTop: 40,
   },
   listContent: {
-    gap: 10,
+    gap: 8,
     padding: 16,
     paddingTop: 0,
   },
@@ -1037,31 +1070,29 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   card: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 12,
-    padding: 12,
+    gap: 10,
+    padding: 10,
   },
   reorderCard: {
     borderColor: colors.secondary,
   },
   reorderControls: {
-    alignSelf: 'stretch',
-    gap: 8,
-    justifyContent: 'center',
-    minWidth: 72,
+    flexDirection: 'row',
+    flexShrink: 0,
+    gap: 6,
   },
   itemActions: {
-    alignSelf: 'stretch',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    flexShrink: 0,
+    gap: 6,
     justifyContent: 'flex-end',
-    minWidth: 72,
   },
   galleryCard: {
     backgroundColor: colors.surface,
@@ -1114,8 +1145,8 @@ const styles = StyleSheet.create({
   goodsImage: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: 8,
-    height: 72,
-    width: 72,
+    height: 64,
+    width: 64,
   },
   imageTapArea: {
     borderRadius: 8,
@@ -1124,9 +1155,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surfaceMuted,
     borderRadius: 8,
-    height: 72,
+    height: 64,
     justifyContent: 'center',
-    width: 72,
+    width: 64,
   },
   imagePlaceholderText: {
     color: colors.muted,
@@ -1135,29 +1166,52 @@ const styles = StyleSheet.create({
   },
   cardBody: {
     flex: 1,
-    gap: 6,
+    gap: 8,
+    minWidth: 0,
+  },
+  cardHeaderRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+    minWidth: 0,
+  },
+  cardTitleBlock: {
+    flex: 1,
+    minWidth: 0,
   },
   itemType: {
     color: colors.primary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
   },
   itemName: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
+  },
+  stockControlsRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    minWidth: 0,
   },
   countSummary: {
     alignItems: 'center',
+    flex: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
+    minWidth: 142,
   },
   countBadge: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: 8,
-    minWidth: 78,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
   countBadgeLabel: {
     color: colors.muted,
@@ -1166,9 +1220,12 @@ const styles = StyleSheet.create({
   },
   countBadgeValue: {
     color: colors.text,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '900',
     marginTop: 2,
+  },
+  cardStepperWrap: {
+    flexShrink: 0,
   },
   countAdjustRow: {
     alignItems: 'center',

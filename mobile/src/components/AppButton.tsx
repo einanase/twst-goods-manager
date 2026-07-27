@@ -2,15 +2,17 @@ import { Pressable, StyleSheet, Text, type GestureResponderEvent } from 'react-n
 import { colors } from '../lib/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'cancel';
+type ButtonSize = 'normal' | 'compact';
 
 type AppButtonProps = {
   label: string;
   onPress: (event: GestureResponderEvent) => void;
   variant?: ButtonVariant;
   disabled?: boolean;
+  size?: ButtonSize;
 };
 
-export function AppButton({ label, onPress, variant = 'primary', disabled = false }: AppButtonProps) {
+export function AppButton({ label, onPress, variant = 'primary', disabled = false, size = 'normal' }: AppButtonProps) {
   const buttonStyleByVariant = {
     primary: styles.primary,
     secondary: styles.secondary,
@@ -37,12 +39,15 @@ export function AppButton({ label, onPress, variant = 'primary', disabled = fals
       }}
       style={({ pressed }) => [
         styles.button,
+        size === 'compact' ? styles.compactButton : null,
         buttonStyleByVariant[variant],
         pressed && !disabled ? styles.pressed : null,
         disabled ? styles.disabled : null,
       ]}
     >
-      <Text style={[styles.label, labelStyleByVariant[variant]]}>{label}</Text>
+      <Text style={[styles.label, size === 'compact' ? styles.compactLabel : null, labelStyleByVariant[variant]]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -55,6 +60,11 @@ const styles = StyleSheet.create({
     minHeight: 42,
     paddingHorizontal: 14,
     paddingVertical: 10,
+  },
+  compactButton: {
+    minHeight: 36,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   primary: {
     backgroundColor: colors.primary,
@@ -84,6 +94,9 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '800',
+  },
+  compactLabel: {
+    fontSize: 13,
   },
   primaryLabel: {
     color: colors.primaryText,
